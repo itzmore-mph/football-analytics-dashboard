@@ -1,0 +1,11 @@
+pandas
+numpy
+scikit-learn
+xgboost
+networkx
+plotly
+matplotlib
+mplsoccer
+streamlit
+joblib
+psycopg2-binary  # Use psycopg2-binary instead of psycopg2

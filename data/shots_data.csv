@@ -1,0 +1,29 @@
+player,team,minute,second,shot_distance,shot_angle,shot_type,body_part,goal_scored,xG
+Lionel Andrés Messi Cuccittini,Barcelona,2,29,111.5,52.9,Half Volley,Unknown,0,0
+Jordi Alba Ramos,Barcelona,5,39,113.9,26.4,Volley,Unknown,0,0
+Lionel Andrés Messi Cuccittini,Barcelona,15,29,93.7,34.7,Normal,Unknown,0,0
+Rubén Sobrino Pozuelo,Deportivo Alavés,16,20,109.2,39.1,Normal,Unknown,0,0
+Luis Alberto Suárez Díaz,Barcelona,18,16,107.8,24.7,Normal,Unknown,0,0
+Ousmane Dembélé,Barcelona,30,42,108.6,27.8,Half Volley,Unknown,0,0
+Ivan Rakitić,Barcelona,35,5,112.5,41.7,Normal,Unknown,0,0
+Lionel Andrés Messi Cuccittini,Barcelona,37,28,96.5,52.6,Normal,Unknown,0,0
+Gerard Piqué Bernabéu,Barcelona,37,31,112.4,41.0,Normal,Unknown,0,0
+Ousmane Dembélé,Barcelona,38,28,102.5,30.1,Normal,Unknown,0,0
+Luis Alberto Suárez Díaz,Barcelona,40,35,110.0,27.7,Lob,Unknown,0,0
+Ousmane Dembélé,Barcelona,43,31,106.1,32.6,Normal,Unknown,0,0
+Jordi Alba Ramos,Barcelona,47,39,116.5,31.2,Normal,Unknown,0,0
+Mubarak Wakaso,Deportivo Alavés,51,7,105.6,23.9,Half Volley,Unknown,0,0
+Luis Alberto Suárez Díaz,Barcelona,53,54,110.3,25.3,Normal,Unknown,0,0
+Philippe Coutinho Correia,Barcelona,54,56,94.9,26.3,Normal,Unknown,0,0
+Jordi Alba Ramos,Barcelona,55,34,106.7,26.5,Normal,Unknown,0,0
+Lionel Andrés Messi Cuccittini,Barcelona,57,21,100.0,57.4,Normal,Unknown,0,0
+Philippe Coutinho Correia,Barcelona,60,36,100.0,27.6,Normal,Unknown,0,0
+Lionel Andrés Messi Cuccittini,Barcelona,63,12,97.8,45.4,Normal,Unknown,1,0
+Lionel Andrés Messi Cuccittini,Barcelona,65,43,106.3,47.0,Normal,Unknown,0,0
+Ivan Rakitić,Barcelona,68,33,88.5,41.2,Half Volley,Unknown,0,0
+Luis Alberto Suárez Díaz,Barcelona,72,27,108.4,30.2,Normal,Unknown,0,0
+Adrián Marín Gómez,Deportivo Alavés,78,17,114.5,32.8,Volley,Unknown,0,0
+Philippe Coutinho Correia,Barcelona,81,31,113.2,31.4,Normal,Unknown,0,0
+Philippe Coutinho Correia,Barcelona,82,41,105.3,33.4,Normal,Unknown,1,0
+Lionel Andrés Messi Cuccittini,Barcelona,89,22,106.6,46.8,Normal,Unknown,0,0
+Lionel Andrés Messi Cuccittini,Barcelona,91,43,111.5,36.2,Normal,Unknown,1,0
