@@ -2,30 +2,45 @@ import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
+import networkx as nx
 from mplsoccer import Pitch
 
-# Define data paths
-DATA_PATH = "data/processed_shots.csv"
+# Define Data Paths
+XG_DATA_PATH = "data/processed_shots.csv"
+PASSING_DATA_PATH = "data/passing_data.csv"
 
 # Load Data
 @st.cache_data
-def load_data():
+def load_xg_data():
     try:
-        df = pd.read_csv(DATA_PATH)
+        df = pd.read_csv(XG_DATA_PATH)
         if "x" not in df.columns or "y" not in df.columns or "xG" not in df.columns:
-            st.error("Data is missing required columns: 'x', 'y', 'xG'")
+            st.error("xG data is missing required columns: 'x', 'y', 'xG'")
             return None
         return df
     except FileNotFoundError:
-        st.error(f"File not found: {DATA_PATH}")
+        st.error(f"File not found: {XG_DATA_PATH}")
         return None
 
-df = load_data()
+@st.cache_data
+def load_passing_data():
+    try:
+        df = pd.read_csv(PASSING_DATA_PATH)
+        if not {"passer", "receiver", "x", "y"}.issubset(df.columns):
+            st.error("Passing data is missing required columns: 'passer', 'receiver', 'x', 'y'")
+            return None
+        return df
+    except FileNotFoundError:
+        st.error(f"File not found: {PASSING_DATA_PATH}")
+        return None
+
+df_xg = load_xg_data()
+df_passing = load_passing_data()
 
 # Streamlit Layout
 st.title("Football Analytics Dashboard")
 st.sidebar.header("Dashboard Navigation")
-page = st.sidebar.radio("Go to", ["xG Shot Map", "xG Distribution", "xG Over Time"])
+page = st.sidebar.radio("Go to", ["xG Shot Map", "xG Distribution", "xG Over Time", "Passing Network"])
 
 # Function: xG Shot Map
 def plot_xG_shotmap(df):
@@ -53,7 +68,7 @@ def plot_xG_distribution(df):
 
 # Function: xG Over Time
 def plot_xG_timeline(df):
-    st.subheader("⏳ xG Progression Over Time")
+    st.subheader("xG Progression Over Time")
     df["minute_group"] = df["minute"] // 10 * 10  # Group by 10-min intervals
     xg_timeline = df.groupby("minute_group")["xG"].sum()
 
@@ -64,15 +79,44 @@ def plot_xG_timeline(df):
     plt.title("xG Progression Over Time")
     st.pyplot(fig)
 
+# Function: Passing Network
+def plot_passing_network(df):
+    st.subheader("Passing Network")
+
+    if df is None or df.empty:
+        st.warning("No passing data found. Please check your dataset.")
+        return
+
+    pitch = Pitch(pitch_type='statsbomb', line_color='black')
+    fig, ax = pitch.draw(figsize=(10, 6))
+
+    G = nx.DiGraph()
+
+    for _, row in df.iterrows():
+        G.add_edge(row["passer"], row["receiver"], weight=row.get("pass_count", 1))
+
+    pos = {player: (row["x"] * 120, row["y"] * 80) for _, row in df.iterrows()}
+
+    node_sizes = [G.degree(player) * 100 for player in G.nodes()]
+    edge_weights = [G[u][v]["weight"] for u, v in G.edges()]
+    
+    nx.draw_networkx_nodes(G, pos, node_size=node_sizes, node_color="blue", alpha=0.7, ax=ax)
+    nx.draw_networkx_edges(G, pos, width=edge_weights, edge_color="black", alpha=0.6, ax=ax)
+    nx.draw_networkx_labels(G, pos, font_size=8, font_color="white", ax=ax)
+
+    plt.title("Passing Network")
+    st.pyplot(fig)
+
 # Display Selected Page
-if df is not None:
-    if page == "xG Shot Map":
-        plot_xG_shotmap(df)
-    elif page == "xG Distribution":
-        plot_xG_distribution(df)
-    elif page == "xG Over Time":
-        plot_xG_timeline(df)
+if page == "xG Shot Map" and df_xg is not None:
+    plot_xG_shotmap(df_xg)
+elif page == "xG Distribution" and df_xg is not None:
+    plot_xG_distribution(df_xg)
+elif page == "xG Over Time" and df_xg is not None:
+    plot_xG_timeline(df_xg)
+elif page == "Passing Network" and df_passing is not None:
+    plot_passing_network(df_passing)
 else:
-    st.warning("Please upload valid processed shot data to continue.")
+    st.warning("Please upload valid processed data to continue.")
 
 st.success("Dashboard Loaded Successfully!")
