@@ -29,7 +29,7 @@ def create_passing_network(df):
     
     required_cols = {'player', 'team'}
     if not required_cols.issubset(df.columns):
-        st.error("🚨 Missing required columns in data!")
+        st.error("Missing required columns in data!")
         return None
 
     G = nx.DiGraph()
@@ -56,23 +56,16 @@ if selection == "Passing Network":
     st.subheader("Passing Network Visualization")
 
     if df is not None:
-        G = create_passing_network(df)
+        G, player_positions = create_passing_network(df)
 
         if G is not None:
             pitch = Pitch(pitch_type='statsbomb', line_color='black')
             fig, ax = pitch.draw(figsize=(10, 7))
 
-            pos = nx.spring_layout(G, seed=42)
-            nx.draw_networkx_nodes(G, pos, node_size=500, ax=ax)
-            nx.draw_networkx_edges(G, pos, width=[d['weight'] for (_, _, d) in G.edges(data=True)], ax=ax)
-            nx.draw_networkx_labels(G, pos, font_size=10, ax=ax)
+            nx.draw_networkx_nodes(G, player_positions, node_size=500, ax=ax, node_color="red")
+            nx.draw_networkx_edges(G, player_positions, ax=ax, width=[d['weight'] for (_, _, d) in G.edges(data=True)], alpha=0.7, edge_color="blue")
+            nx.draw_networkx_labels(G, player_positions, font_size=10, ax=ax)
 
             st.pyplot(fig)
         else:
             st.warning("No valid passing network data to display.")
-    else:
-        st.warning("Data not loaded!")
-
-elif selection == "Expected Goals (xG)":
-    st.subheader("Expected Goals (xG) Visualization")
-    st.write("Coming soon!")
