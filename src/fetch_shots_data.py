@@ -2,39 +2,42 @@ import os
 import json
 import pandas as pd
 
-def extract_shots(json_file, output_csv):
-    # Load JSON data
-    with open(json_file, "r", encoding="utf-8") as file:
-        data = json.load(file)
+# Define file paths
+DATA_DIR = os.path.join(os.path.dirname(__file__), "../data")
+RAW_JSON_PATH = os.path.join(DATA_DIR, "15946.json")  # Adjust as needed
+OUTPUT_CSV_PATH = os.path.join(DATA_DIR, "shots_data.csv")
 
-    # Extract shot events
-    shot_data = []
-    for event in data:
+def extract_shots():
+    """Extracts shots from StatsBomb JSON and saves them as a CSV."""
+    if not os.path.exists(RAW_JSON_PATH):
+        print(f"Missing raw match data file: {RAW_JSON_PATH}")
+        return
+
+    with open(RAW_JSON_PATH, "r") as file:
+        events = json.load(file)
+
+    shots = []
+    for event in events:
         if event["type"]["name"] == "Shot":
-            shot_data.append({
+            shot = {
                 "player": event["player"]["name"],
                 "team": event["team"]["name"],
                 "minute": event["minute"],
                 "second": event["second"],
-                "shot_distance": event["location"][0] if "location" in event else None,
-                "shot_angle": event["location"][1] if "location" in event else None,
-                "shot_type": event["shot"].get("technique", {}).get("name", "Unknown"),
-                "body_part": event["shot"].get("bodyPart", {}).get("name", "Unknown"),
+                "x": event["location"][0] if "location" in event else None,
+                "y": event["location"][1] if "location" in event else None,
+                "shot_distance": None,  # Will calculate in preprocess_xG.py
+                "shot_angle": None,     # Will calculate in preprocess_xG.py
+                "shot_type": event["shot"]["technique"]["name"],
+                "body_part": event["shot"]["body_part"]["name"],
                 "goal_scored": 1 if event["shot"]["outcome"]["name"] == "Goal" else 0,
-                "xG": event["shot"].get("xG", 0)  # Use 0 if xG is missing
-            })
-
-    # Convert to DataFrame
-    df_shots = pd.DataFrame(shot_data)
+            }
+            shots.append(shot)
 
     # Save as CSV
-    df_shots.to_csv(output_csv, index=False)
-    print(f"Shot data saved to {output_csv}")
+    df = pd.DataFrame(shots)
+    df.to_csv(OUTPUT_CSV_PATH, index=False)
+    print(f"Shot data saved at: {OUTPUT_CSV_PATH}")
 
-# Define file paths
-PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
-JSON_PATH = os.path.join(PROJECT_ROOT, "../data/15946.json")  # Update to your match file
-CSV_PATH = os.path.join(PROJECT_ROOT, "../data/shots_data.csv")
-
-# Run the function
-extract_shots(JSON_PATH, CSV_PATH)
+if __name__ == "__main__":
+    extract_shots()

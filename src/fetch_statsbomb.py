@@ -1,38 +1,25 @@
 import os
 import requests
-import pandas as pd
+import json
 
-def fetch_statsbomb_xg():
-    MATCH_ID = 7561  # Example match ID
-    URL = f"https://raw.githubusercontent.com/statsbomb/open-data/master/data/events/{MATCH_ID}.json"
+# Define the output directory
+DATA_DIR = os.path.join(os.path.dirname(__file__), "../data")
+os.makedirs(DATA_DIR, exist_ok=True)
 
-    # Define absolute path
-    PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
-    DATA_PATH = os.path.join(PROJECT_ROOT, "../data/shots_data.csv")
+# URL for a sample StatsBomb open data match
+MATCH_ID = "15946"  # Replace with another ID if needed
+URL = f"https://raw.githubusercontent.com/statsbomb/open-data/master/data/events/{MATCH_ID}.json"
 
-    # Fetch data
-    df = pd.read_json(URL)
-    shots = df[df["type"].apply(lambda x: x.get("name", "")) == "Shot"]
-
-
-    shot_data = []
-    for _, row in shots.iterrows():
-        shot_data.append({
-            "player": row["player"]["name"],
-            "team": row["team"]["name"],
-            "minute": row["minute"],
-            "shot_distance": row["location"][0],
-            "shot_angle": row["location"][1],
-            "body_part": row["shot"].get("bodyPart", {}).get("name", "Unknown"),
-            "shot_type": row["shot"]["technique"]["name"],
-            "goal_scored": 1 if row["shot"]["outcome"]["name"] == "Goal" else 0,
-            "xG": row["shot"].get("xG", 0)  # Default to 0 if missing
-        })
-
-    # Save data
-    df_shots = pd.DataFrame(shot_data)
-    df_shots.to_csv(DATA_PATH, index=False)
-    print("Shot data saved!")
+def fetch_match_data():
+    """Fetch match data from StatsBomb and save it locally."""
+    response = requests.get(URL)
+    if response.status_code == 200:
+        file_path = os.path.join(DATA_DIR, f"{MATCH_ID}.json")
+        with open(file_path, "w") as file:
+            json.dump(response.json(), file, indent=4)
+        print(f"Match data saved at: {file_path}")
+    else:
+        print(f"Failed to fetch data. Status code: {response.status_code}")
 
 if __name__ == "__main__":
-    fetch_statsbomb_xg()
+    fetch_match_data()
