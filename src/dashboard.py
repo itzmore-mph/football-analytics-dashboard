@@ -1,71 +1,78 @@
 import streamlit as st
 import pandas as pd
-import os
-import networkx as nx
 import matplotlib.pyplot as plt
+import seaborn as sns
 from mplsoccer import Pitch
 
-# Define paths
-PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
-DATA_PATH = os.path.join(PROJECT_ROOT, "../data/processed_shots.csv")
+# Define data paths
+DATA_PATH = "data/processed_shots.csv"
 
-# Load data
+# Load Data
 @st.cache_data
 def load_data():
-    if os.path.exists(DATA_PATH):
-        return pd.read_csv(DATA_PATH)
-    else:
-        st.error(f"Data file not found: {DATA_PATH}")
+    try:
+        df = pd.read_csv(DATA_PATH)
+        if "x" not in df.columns or "y" not in df.columns or "xG" not in df.columns:
+            st.error("Data is missing required columns: 'x', 'y', 'xG'")
+            return None
+        return df
+    except FileNotFoundError:
+        st.error(f"File not found: {DATA_PATH}")
         return None
 
 df = load_data()
 
-# Function to create a passing network
-def create_passing_network(df):
-    """Generates a passing network graph."""
-    
-    if df is None:
-        return None
-    
-    required_cols = {'player', 'team'}
-    if not required_cols.issubset(df.columns):
-        st.error("Missing required columns in data!")
-        return None
-
-    G = nx.DiGraph()
-
-    for i in range(1, len(df)):
-        passer = df.loc[i - 1, 'player']
-        receiver = df.loc[i, 'player']
-        team = df.loc[i, 'team']
-
-        if passer != receiver:
-            if G.has_edge(passer, receiver):
-                G[passer][receiver]['weight'] += 1
-            else:
-                G.add_edge(passer, receiver, weight=1, team=team)
-
-    return G
-
-# Streamlit UI
+# Streamlit Layout
 st.title("Football Analytics Dashboard")
-st.sidebar.header("Navigation")
-selection = st.sidebar.radio("Select Visualization", ["Expected Goals (xG)", "Passing Network"])
+st.sidebar.header("Dashboard Navigation")
+page = st.sidebar.radio("Go to", ["xG Shot Map", "xG Distribution", "xG Over Time"])
 
-if selection == "Passing Network":
-    st.subheader("Passing Network Visualization")
+# Function: xG Shot Map
+def plot_xG_shotmap(df):
+    st.subheader("Expected Goals (xG) Shot Map")
+    pitch = Pitch(pitch_type='statsbomb', line_color='black')
+    fig, ax = pitch.draw(figsize=(10, 6))
 
-    if df is not None:
-        G, player_positions = create_passing_network(df)
+    scatter = ax.scatter(
+        df["x"] * 120, df["y"] * 80,  # Scale to pitch size
+        c=df["xG"], cmap="Reds", edgecolors="black", s=df["xG"] * 200, alpha=0.8
+    )
+    plt.colorbar(scatter, ax=ax, label="Expected Goals (xG)")
+    plt.title("Shot Map with Expected Goals")
+    st.pyplot(fig)
 
-        if G is not None:
-            pitch = Pitch(pitch_type='statsbomb', line_color='black')
-            fig, ax = pitch.draw(figsize=(10, 7))
+# Function: xG Distribution
+def plot_xG_distribution(df):
+    st.subheader("xG Distribution")
+    fig, ax = plt.subplots(figsize=(8, 5))
+    sns.histplot(df["xG"], bins=20, kde=True, color="red", alpha=0.7)
+    plt.xlabel("Expected Goals (xG)")
+    plt.ylabel("Number of Shots")
+    plt.title("xG Distribution")
+    st.pyplot(fig)
 
-            nx.draw_networkx_nodes(G, player_positions, node_size=500, ax=ax, node_color="red")
-            nx.draw_networkx_edges(G, player_positions, ax=ax, width=[d['weight'] for (_, _, d) in G.edges(data=True)], alpha=0.7, edge_color="blue")
-            nx.draw_networkx_labels(G, player_positions, font_size=10, ax=ax)
+# Function: xG Over Time
+def plot_xG_timeline(df):
+    st.subheader("⏳ xG Progression Over Time")
+    df["minute_group"] = df["minute"] // 10 * 10  # Group by 10-min intervals
+    xg_timeline = df.groupby("minute_group")["xG"].sum()
 
-            st.pyplot(fig)
-        else:
-            st.warning("No valid passing network data to display.")
+    fig, ax = plt.subplots(figsize=(8, 5))
+    plt.plot(xg_timeline.index, xg_timeline.values, marker="o", linestyle="-", color="red")
+    plt.xlabel("Minute")
+    plt.ylabel("Total xG")
+    plt.title("xG Progression Over Time")
+    st.pyplot(fig)
+
+# Display Selected Page
+if df is not None:
+    if page == "xG Shot Map":
+        plot_xG_shotmap(df)
+    elif page == "xG Distribution":
+        plot_xG_distribution(df)
+    elif page == "xG Over Time":
+        plot_xG_timeline(df)
+else:
+    st.warning("Please upload valid processed shot data to continue.")
+
+st.success("Dashboard Loaded Successfully!")
