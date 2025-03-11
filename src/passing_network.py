@@ -4,35 +4,61 @@ import networkx as nx
 import matplotlib.pyplot as plt
 from mplsoccer import Pitch
 
-def generate_passing_network():
-    # Define absolute path
-    PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
-    DATA_PATH = os.path.join(PROJECT_ROOT, "../data/passing_data.csv")
+# Define file paths dynamically
+PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
+DATA_PATH = os.path.join(PROJECT_ROOT, "../data/processed_shots.csv")
 
-    # Ensure data file exists
-    if not os.path.exists(DATA_PATH):
-        print(f"Error: Missing passing data file: {DATA_PATH}")
-        return
+def create_passing_network(df):
+    """Generates a passing network graph from the dataset."""
+    
+    # Ensure required columns exist
+    required_cols = {'player', 'team'}
+    if not required_cols.issubset(df.columns):
+        print(f"Error: Missing required columns in {DATA_PATH}")
+        return None
 
-    # Load data
-    df = pd.read_csv(DATA_PATH)
-    team = "Team X"  # Example team
-    df_team = df[df["team"] == team]
-
-    # Create a passing network
+    # Initialize NetworkX graph
     G = nx.DiGraph()
-    for _, row in df_team.iterrows():
-        G.add_edge(row["passer"], row["receiver"], weight=row["pass_count"])
 
-    # Plot passing network
-    fig, ax = plt.subplots(figsize=(8, 5))
+    # Add edges based on passes (assuming previous player made the pass)
+    for i in range(1, len(df)):
+        passer = df.loc[i - 1, 'player']
+        receiver = df.loc[i, 'player']
+        team = df.loc[i, 'team']
+
+        if passer != receiver:  # Avoid self-passes
+            if G.has_edge(passer, receiver):
+                G[passer][receiver]['weight'] += 1  # Increase pass count
+            else:
+                G.add_edge(passer, receiver, weight=1, team=team)
+
+    return G
+
+def plot_passing_network(G):
+    """Plots the passing network on a football pitch."""
+    
+    if G is None:
+        print("⚠️ No valid passing network data to plot.")
+        return
+    
     pitch = Pitch(pitch_type='statsbomb', line_color='black')
-    pitch.draw(ax=ax)
+    fig, ax = pitch.draw(figsize=(10, 7))
 
-    pos = nx.spring_layout(G)
-    nx.draw(G, pos, ax=ax, with_labels=True, node_size=5000, edge_color="black", width=2)
-    plt.title(f"Passing Network: {team}")
+    # Extract positions (dummy positions)
+    pos = nx.spring_layout(G, seed=42)
+
+    # Draw network nodes & edges
+    nx.draw_networkx_nodes(G, pos, node_size=500, ax=ax)
+    nx.draw_networkx_edges(G, pos, width=[d['weight'] for (_, _, d) in G.edges(data=True)], ax=ax)
+    nx.draw_networkx_labels(G, pos, font_size=10, ax=ax)
+
+    plt.title("Passing Network")
     plt.show()
 
 if __name__ == "__main__":
-    generate_passing_network()
+    if not os.path.exists(DATA_PATH):
+        print(f"Error: Data file {DATA_PATH} not found.")
+    else:
+        df = pd.read_csv(DATA_PATH)
+        G = create_passing_network(df)
+        plot_passing_network(G)

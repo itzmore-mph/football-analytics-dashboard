@@ -1,44 +1,78 @@
-import os
-import pandas as pd
 import streamlit as st
-import joblib
+import pandas as pd
+import os
+import networkx as nx
 import matplotlib.pyplot as plt
 from mplsoccer import Pitch
 
-# Define the correct project root directory
+# Define paths
 PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
-
-# Load Data (Using Absolute Paths)
 DATA_PATH = os.path.join(PROJECT_ROOT, "../data/processed_shots.csv")
-MODEL_PATH = os.path.join(PROJECT_ROOT, "../models/xgboost_xg_model.pkl")
 
-# Ensure file exists
-if not os.path.exists(DATA_PATH):
-    st.error(f"Missing data file: {DATA_PATH}")
-    st.stop()
-if not os.path.exists(MODEL_PATH):
-    st.error(f"Missing model file: {MODEL_PATH}")
-    st.stop()
+# Load data
+@st.cache_data
+def load_data():
+    if os.path.exists(DATA_PATH):
+        return pd.read_csv(DATA_PATH)
+    else:
+        st.error(f"Data file not found: {DATA_PATH}")
+        return None
 
-# Load data and model
-df = pd.read_csv(DATA_PATH)
-model = joblib.load(MODEL_PATH)
+df = load_data()
 
+# Function to create a passing network
+def create_passing_network(df):
+    """Generates a passing network graph."""
+    
+    if df is None:
+        return None
+    
+    required_cols = {'player', 'team'}
+    if not required_cols.issubset(df.columns):
+        st.error("🚨 Missing required columns in data!")
+        return None
+
+    G = nx.DiGraph()
+
+    for i in range(1, len(df)):
+        passer = df.loc[i - 1, 'player']
+        receiver = df.loc[i, 'player']
+        team = df.loc[i, 'team']
+
+        if passer != receiver:
+            if G.has_edge(passer, receiver):
+                G[passer][receiver]['weight'] += 1
+            else:
+                G.add_edge(passer, receiver, weight=1, team=team)
+
+    return G
+
+# Streamlit UI
 st.title("Football Analytics Dashboard")
-view = st.sidebar.radio("Choose Analysis", ["Expected Goals (xG)", "Passing Network"])
+st.sidebar.header("Navigation")
+selection = st.sidebar.radio("Select Visualization", ["Expected Goals (xG)", "Passing Network"])
 
-if view == "Expected Goals (xG)":
-    st.subheader("Expected Goals (xG) Shot Map")
-    player = st.selectbox("Choose a Player:", df["player"].unique())
-    player_data = df[df["player"] == player]
+if selection == "Passing Network":
+    st.subheader("Passing Network Visualization")
 
-    fig, ax = plt.subplots(figsize=(8, 5))
-    pitch = Pitch(pitch_type='statsbomb', line_color='black')
-    pitch.draw(ax=ax)
+    if df is not None:
+        G = create_passing_network(df)
 
-    ax.scatter(player_data["shot_distance"] * 120, player_data["shot_angle"] * 80,
-               c=player_data["predicted_xG"], cmap="Reds", edgecolors="black", s=100)
-    fig.colorbar(ax.collections[0], label="Expected Goals (xG)")
+        if G is not None:
+            pitch = Pitch(pitch_type='statsbomb', line_color='black')
+            fig, ax = pitch.draw(figsize=(10, 7))
 
-    st.pyplot(fig)
-    st.dataframe(player_data[["minute", "shot_distance", "shot_angle", "predicted_xG"]])
+            pos = nx.spring_layout(G, seed=42)
+            nx.draw_networkx_nodes(G, pos, node_size=500, ax=ax)
+            nx.draw_networkx_edges(G, pos, width=[d['weight'] for (_, _, d) in G.edges(data=True)], ax=ax)
+            nx.draw_networkx_labels(G, pos, font_size=10, ax=ax)
+
+            st.pyplot(fig)
+        else:
+            st.warning("No valid passing network data to display.")
+    else:
+        st.warning("Data not loaded!")
+
+elif selection == "Expected Goals (xG)":
+    st.subheader("Expected Goals (xG) Visualization")
+    st.write("Coming soon!")
