@@ -1,0 +1,39 @@
+# Ignore Python Bytecode Files
+__pycache__/
+*.py[cod]
+*.so
+
+# Ignore Virtual Environment
+venv/
+env/
+*.env
+
+# Ignore Jupyter Notebook Checkpoints
+.ipynb_checkpoints/
+
+# Ignore Data Files
+data/*.csv
+data/*.json
+data/*.xlsx
+data/*.pkl
+data/*.db
+
+# Ignore Model Files
+models/*.pkl
+models/*.h5
+models/*.joblib
+models/*.sav
+
+# Ignore Logs and Cache
+logs/
+*.log
+*.cache
+*.sqlite
+*.db
+
+# Ignore System Files (Mac & Windows)
+.DS_Store
+Thumbs.db
+
+# Ignore Streamlit Deployment Files
+.streamlit/
