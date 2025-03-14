@@ -1,45 +1,73 @@
 import os
-import pandas as pd
 import streamlit as st
+import pandas as pd
 import matplotlib.pyplot as plt
-from mplsoccer import Pitch
 import networkx as nx
+from mplsoccer import Pitch
 
-# Define Paths
-PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
-DATA_PATH = os.path.join(PROJECT_ROOT, "../data/processed_shots.csv")
+# Define paths
+SHOT_DATA_PATH = "data/processed_shots.csv"
+PASSING_DATA_PATH = "data/processed_passing_data.csv"
 
-# Load Data
+# Load shot data
 @st.cache_data
-def load_data():
-    return pd.read_csv(DATA_PATH) if os.path.exists(DATA_PATH) else None
+def load_shot_data():
+    if os.path.exists(SHOT_DATA_PATH):
+        return pd.read_csv(SHOT_DATA_PATH)
+    return None
 
-df = load_data()
+# Load passing data
+@st.cache_data
+def load_passing_data():
+    if os.path.exists(PASSING_DATA_PATH):
+        return pd.read_csv(PASSING_DATA_PATH)
+    return None
 
-# Streamlit UI
-st.title("Football Analytics Dashboard")
-if df is None:
-    st.warning("Please upload valid processed data to continue.")
-    st.stop()
+# Function to visualize shots
+def plot_shot_map(df):
+    pitch = Pitch(pitch_type="statsbomb", pitch_color="white", line_color="black")
+    fig, ax = pitch.draw(figsize=(8, 5))
+    
+    if df is not None:
+        scatter = ax.scatter(df["x"] * 120, df["y"] * 80, c=df["xG"], cmap="Reds", edgecolors="black", s=80)
+        plt.colorbar(scatter, ax=ax, label="Expected Goals (xG)")
+    
+    st.pyplot(fig)
 
-# Shot Data Visualization
-st.subheader("Shot Data")
-fig, ax = plt.subplots()
-pitch = Pitch(line_color='black')
-pitch.draw(ax=ax)
-ax.scatter(df["x"] * 120, df["y"] * 80, c=df["xG"], cmap='Reds', edgecolors='black', s=80)
-st.pyplot(fig)
+# Function to visualize passing network
+def plot_passing_network(df):
+    if df is None or not set(["passer", "receiver", "x", "y"]).issubset(df.columns):
+        st.warning("Passing data is missing required columns: 'passer', 'receiver', 'x', 'y'")
+        return
 
-# Passing Network Visualization
-st.subheader("Passing Network")
-fig, ax = plt.subplots()
-pitch.draw(ax=ax)
-G = nx.DiGraph()
-for _, row in df.iterrows():
-    if "passer" in df.columns and "receiver" in df.columns:
+    pitch = Pitch(pitch_type="statsbomb", pitch_color="white", line_color="black")
+    fig, ax = pitch.draw(figsize=(8, 5))
+
+    G = nx.DiGraph()
+    
+    for _, row in df.iterrows():
         G.add_edge(row["passer"], row["receiver"], weight=row.get("pass_count", 1))
-if G.number_of_nodes() == 0:
-    st.warning("Passing network not available.")
-st.pyplot(fig)
+
+    pos = {player: (row["x"] * 120, row["y"] * 80) for _, row in df.iterrows()}
+
+    node_sizes = [G.degree(n) * 100 for n in G.nodes()]
+    edge_widths = [G[u][v]["weight"] / 2 for u, v in G.edges()]
+
+    nx.draw_networkx_nodes(G, pos, node_size=node_sizes, node_color="blue", alpha=0.6, ax=ax)
+    nx.draw_networkx_edges(G, pos, width=edge_widths, edge_color="black", alpha=0.7, ax=ax)
+    nx.draw_networkx_labels(G, pos, font_size=9, font_color="black", ax=ax)
+
+    st.pyplot(fig)
+
+# Streamlit Dashboard
+st.title("⚽ Football Analytics Dashboard")
+
+st.subheader("Shot Data")
+shot_data = load_shot_data()
+plot_shot_map(shot_data)
+
+st.subheader("Passing Network")
+passing_data = load_passing_data()
+plot_passing_network(passing_data)
 
 st.success("Dashboard Loaded Successfully!")
