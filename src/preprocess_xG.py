@@ -1,36 +1,30 @@
 import os
 import pandas as pd
 
-# Define file paths dynamically
+# Define Paths
 PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
-DATA_PATH = os.path.join(PROJECT_ROOT, "../data/shots_data.csv")
-OUTPUT_PATH = os.path.join(PROJECT_ROOT, "../data/processed_shots.csv")
+RAW_DATA_PATH = os.path.join(PROJECT_ROOT, "../data/shots_data.csv")
+PROCESSED_DATA_PATH = os.path.join(PROJECT_ROOT, "../data/processed_shots.csv")
 
-def preprocess_shots():
-    """Loads raw shot data, normalizes coordinates, and saves processed data."""
-    
-    # Ensure raw data file exists
-    if not os.path.exists(DATA_PATH):
-        print(f"Error: Missing raw data file: {DATA_PATH}")
-        return
+# Ensure Data Exists
+if not os.path.exists(RAW_DATA_PATH):
+    print(f"Error: Missing raw data file: {RAW_DATA_PATH}")
+    exit()
 
-    # Load the dataset
-    df = pd.read_csv(DATA_PATH)
+# Load Data
+df = pd.read_csv(RAW_DATA_PATH)
 
-    # Normalize shot coordinates (assuming pitch dimensions are 120m x 80m)
-    if "x" in df.columns and "y" in df.columns:
-        df["x"] = df["x"] / 120
-        df["y"] = df["y"] / 80
+# Validate Required Columns
+required_columns = ["player", "team", "minute", "shot_distance", "shot_angle", "goal_scored"]
+missing_cols = [col for col in required_columns if col not in df.columns]
+if missing_cols:
+    print(f"Error: Missing columns in dataset: {missing_cols}")
+    exit()
 
-    # Normalize shot distance & angle if available
-    if "shot_distance" in df.columns:
-        df["shot_distance"] /= df["shot_distance"].max()
-    if "shot_angle" in df.columns:
-        df["shot_angle"] /= df["shot_angle"].max()
+# Normalize & Scale Data
+df["shot_distance"] /= df["shot_distance"].max()
+df["shot_angle"] /= df["shot_angle"].max()
 
-    # Save processed data
-    df.to_csv(OUTPUT_PATH, index=False)
-    print(f"✅ Processed shot data saved: {OUTPUT_PATH}")
-
-if __name__ == "__main__":
-    preprocess_shots()
+# Save Processed Data
+df.to_csv(PROCESSED_DATA_PATH, index=False)
+print("Shot data preprocessed and saved successfully!")

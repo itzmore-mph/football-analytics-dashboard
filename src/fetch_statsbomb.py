@@ -1,25 +1,24 @@
-import os
 import requests
+import os
 import json
 
-# Define the output directory
+# Define paths
 DATA_DIR = os.path.join(os.path.dirname(__file__), "../data")
+MATCH_DATA_PATH = os.path.join(DATA_DIR, "15946.json")
+
+# Ensure data directory exists
 os.makedirs(DATA_DIR, exist_ok=True)
 
-# URL for a sample StatsBomb open data match
-MATCH_ID = "15946"  # Replace with another ID if needed
-URL = f"https://raw.githubusercontent.com/statsbomb/open-data/master/data/events/{MATCH_ID}.json"
-
 def fetch_match_data():
-    """Fetch match data from StatsBomb and save it locally."""
-    response = requests.get(URL)
+    url = "https://raw.githubusercontent.com/statsbomb/open-data/master/data/events/15946.json"
+    response = requests.get(url)
+
     if response.status_code == 200:
-        file_path = os.path.join(DATA_DIR, f"{MATCH_ID}.json")
-        with open(file_path, "w") as file:
-            json.dump(response.json(), file, indent=4)
-        print(f"Match data saved at: {file_path}")
+        with open(MATCH_DATA_PATH, "w") as f:
+            json.dump(response.json(), f, indent=4)
+        print(f"Match data saved to {MATCH_DATA_PATH}")
     else:
-        print(f"Failed to fetch data. Status code: {response.status_code}")
+        print("Failed to fetch match data.")
 
 if __name__ == "__main__":
     fetch_match_data()
