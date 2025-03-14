@@ -4,42 +4,68 @@ import networkx as nx
 import matplotlib.pyplot as plt
 from mplsoccer import Pitch
 
-# Define Paths
-PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
-DATA_PATH = os.path.join(PROJECT_ROOT, "../data/processed_shots.csv")
+data_path = "data/processed_shots.csv"
 
-# Ensure Data Exists
-if not os.path.exists(DATA_PATH):
-    print(f"Error: Data file {DATA_PATH} not found.")
-    exit()
+def load_data():
+    if not os.path.exists(data_path):
+        print(f"Error: Data file {data_path} not found.")
+        return None
+    
+    df = pd.read_csv(data_path)
+    required_columns = {'passer', 'receiver', 'x', 'y'}
+    
+    if not required_columns.issubset(df.columns):
+        print(f"Error: Passing data is missing required columns: {required_columns - set(df.columns)}")
+        return None
+    
+    return df
 
-# Load Data
-df = pd.read_csv(DATA_PATH)
+def create_passing_network(df):
+    G = nx.DiGraph()
+    
+    for _, row in df.iterrows():
+        passer, receiver = row['passer'], row['receiver']
+        x, y = row['x'], row['y']
+        
+        if not G.has_node(passer):
+            G.add_node(passer, pos=(x, y))
+        
+        if not G.has_node(receiver):
+            G.add_node(receiver, pos=(x + 5, y))  # Slight offset for better visibility
+        
+        if G.has_edge(passer, receiver):
+            G[passer][receiver]['weight'] += 1
+        else:
+            G.add_edge(passer, receiver, weight=1)
+    
+    return G
 
-# Validate Required Columns
-required_columns = ["passer", "receiver", "x", "y"]
-missing_cols = [col for col in required_columns if col not in df.columns]
-if missing_cols:
-    print(f"Error: Passing data is missing required columns: {missing_cols}")
-    exit()
+def plot_passing_network(G):
+    pitch = Pitch(pitch_type='statsbomb', line_color='black')
+    fig, ax = pitch.draw(figsize=(10, 6))
+    
+    pos = nx.get_node_attributes(G, 'pos')
+    node_sizes = [G.degree(n) * 150 for n in G.nodes()]
+    
+    nx.draw_networkx_nodes(G, pos, ax=ax, node_size=node_sizes, node_color='blue', alpha=0.7)
+    nx.draw_networkx_labels(G, pos, ax=ax, font_size=8, font_color='white', font_weight='bold')
+    
+    edges = G.edges(data=True)
+    edge_widths = [0.5 + (d['weight'] * 0.3) for (_, _, d) in edges]
+    
+    nx.draw_networkx_edges(G, pos, ax=ax, edge_color='black', width=edge_widths, alpha=0.6)
+    
+    plt.title("Passing Network", fontsize=14, fontweight='bold')
+    plt.show()
 
-# Create Passing Network
-G = nx.DiGraph()
-for _, row in df.iterrows():
-    G.add_edge(row["passer"], row["receiver"], weight=row.get("pass_count", 1))
+def main():
+    df = load_data()
+    if df is None:
+        print("Passing network not available.")
+        return
+    
+    G = create_passing_network(df)
+    plot_passing_network(G)
 
-# Plot Passing Network
-fig, ax = plt.subplots(figsize=(10, 6))
-pitch = Pitch(line_color='black')
-pitch.draw(ax=ax)
-
-# Position Nodes on the Pitch
-pos = {player: (df[df['player'] == player]['x'].mean(), df[df['player'] == player]['y'].mean()) for player in df['player'].unique()}
-
-# Draw Network
-nx.draw_networkx_nodes(G, pos, node_size=500, node_color="blue", alpha=0.7, ax=ax)
-nx.draw_networkx_edges(G, pos, alpha=0.5, width=1.5, edge_color='black', ax=ax)
-nx.draw_networkx_labels(G, pos, font_size=8, font_color='white', ax=ax)
-
-plt.title("Passing Network")
-plt.show()
+if __name__ == "__main__":
+    main()
