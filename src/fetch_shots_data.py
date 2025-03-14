@@ -2,42 +2,35 @@ import os
 import json
 import pandas as pd
 
-# Define file paths
+# Define paths
 DATA_DIR = os.path.join(os.path.dirname(__file__), "../data")
-RAW_JSON_PATH = os.path.join(DATA_DIR, "15946.json")  # Adjust as needed
-OUTPUT_CSV_PATH = os.path.join(DATA_DIR, "shots_data.csv")
+MATCH_DATA_PATH = os.path.join(DATA_DIR, "15946.json")
+SHOTS_DATA_PATH = os.path.join(DATA_DIR, "shots_data.csv")
 
-def extract_shots():
-    """Extracts shots from StatsBomb JSON and saves them as a CSV."""
-    if not os.path.exists(RAW_JSON_PATH):
-        print(f"Missing raw match data file: {RAW_JSON_PATH}")
+def extract_shot_data():
+    if not os.path.exists(MATCH_DATA_PATH):
+        print(f"Error: {MATCH_DATA_PATH} not found. Run fetch_statsbomb.py first.")
         return
 
-    with open(RAW_JSON_PATH, "r") as file:
-        events = json.load(file)
+    with open(MATCH_DATA_PATH, "r") as f:
+        events = json.load(f)
 
-    shots = []
+    shot_data = []
     for event in events:
         if event["type"]["name"] == "Shot":
-            shot = {
+            shot_data.append({
                 "player": event["player"]["name"],
                 "team": event["team"]["name"],
-                "minute": event["minute"],
-                "second": event["second"],
-                "x": event["location"][0] if "location" in event else None,
-                "y": event["location"][1] if "location" in event else None,
-                "shot_distance": None,  # Will calculate in preprocess_xG.py
-                "shot_angle": None,     # Will calculate in preprocess_xG.py
-                "shot_type": event["shot"]["technique"]["name"],
-                "body_part": event["shot"]["body_part"]["name"],
-                "goal_scored": 1 if event["shot"]["outcome"]["name"] == "Goal" else 0,
-            }
-            shots.append(shot)
+                "x": event["location"][0],
+                "y": event["location"][1],
+                "shot_distance": event["shot"]["end_location"][0] - event["location"][0],
+                "shot_angle": event["shot"]["end_location"][1] - event["location"][1],
+                "goal_scored": int(event["shot"]["outcome"]["name"] == "Goal")
+            })
 
-    # Save as CSV
-    df = pd.DataFrame(shots)
-    df.to_csv(OUTPUT_CSV_PATH, index=False)
-    print(f"Shot data saved at: {OUTPUT_CSV_PATH}")
+    df = pd.DataFrame(shot_data)
+    df.to_csv(SHOTS_DATA_PATH, index=False)
+    print(f"Shot data saved to {SHOTS_DATA_PATH}")
 
 if __name__ == "__main__":
-    extract_shots()
+    extract_shot_data()
