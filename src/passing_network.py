@@ -4,7 +4,7 @@ import networkx as nx
 import matplotlib.pyplot as plt
 from mplsoccer import Pitch
 
-data_path = "data/processed_shots.csv"
+data_path = "data/passing_data.csv"
 
 def load_data():
     if not os.path.exists(data_path):
@@ -69,3 +69,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+centrality = nx.betweenness_centrality(G, weight="weight")
+# Use centrality to scale node sizes
+node_sizes = [centrality.get(n, 0.01) * 3000 for n in G.nodes()]

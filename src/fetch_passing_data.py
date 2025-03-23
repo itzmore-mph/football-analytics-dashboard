@@ -11,31 +11,45 @@ def extract_passing_data():
     with open(RAW_JSON_PATH, "r", encoding="utf-8") as f:
         data = json.load(f)
 
-    passing_data = []
+passing_data = []
     
-    for event in data:
-        if event["type"]["name"] == "Pass":
-            pass_event = {
-                "passer": event["player"]["name"],
-                "receiver": event["pass"].get("recipient", {}).get("name", None),
-                "team": event["team"]["name"],
-                "minute": event["minute"],
-                "second": event["second"],
-                "start_x": event["location"][0],  # Starting x coordinate
-                "start_y": event["location"][1],  # Starting y coordinate
-                "end_x": event["pass"]["end_location"][0],
-                "end_y": event["pass"]["end_location"][1],
-                "pass_length": event["pass"].get("length", None),
-                "pass_angle": event["pass"].get("angle", None),
-                "pass_outcome": event["pass"].get("outcome", {}).get("name", "Complete"),
-            }
-            passing_data.append(pass_event)
+for event in data:
+    if event["type"]["name"] == "Pass":
+        pass_event = {
+            "passer": event["player"]["name"],
+            "receiver": event["pass"].get("recipient", {}).get("name", None),
+            "team": event["team"]["name"],
+            "minute": event["minute"],
+            "second": event["second"],
+            "start_x": event["location"][0],  # Starting x coordinate
+            "start_y": event["location"][1],  # Starting y coordinate
+            "end_x": event["pass"]["end_location"][0],
+            "end_y": event["pass"]["end_location"][1],
+            "pass_length": event["pass"].get("length", None),
+            "pass_angle": event["pass"].get("angle", None),
+            "pass_outcome": event["pass"].get("outcome", {}).get("name", "Complete"),
+        }
+        passing_data.append(pass_event)
 
-    df = pd.DataFrame(passing_data)
+df = pd.DataFrame(passing_data)
 
     # Save the extracted data
-    df.to_csv(OUTPUT_CSV_PATH, index=False)
-    print("Passing data extracted and saved!")
+df.to_csv(OUTPUT_CSV_PATH, index=False)
+print("Passing data extracted and saved!")
 
 if __name__ == "__main__":
     extract_passing_data()
+    
+# Add average pass position
+df["x"] = (df["start_x"] + df["end_x"]) / 2
+df["y"] = (df["start_y"] + df["end_y"]) / 2
+
+df = df.groupby(["passer", "receiver"]).agg({
+    "x": "mean",
+    "y": "mean",
+    "pass_length": "mean",
+    "pass_angle": "mean",
+    "pass_outcome": lambda x: (x == "Complete").sum(),
+    "passer": "count"
+}).rename(columns={"passer": "pass_count"}).reset_index()
+

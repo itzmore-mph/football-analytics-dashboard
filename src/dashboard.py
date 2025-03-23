@@ -28,9 +28,13 @@ def plot_shot_map(df):
     pitch = Pitch(pitch_type="statsbomb", pitch_color="white", line_color="black")
     fig, ax = pitch.draw(figsize=(8, 5))
     
-    if df is not None:
-        scatter = ax.scatter(df["x"] * 120, df["y"] * 80, c=df["xG"], cmap="Reds", edgecolors="black", s=80)
-        plt.colorbar(scatter, ax=ax, label="Expected Goals (xG)")
+if df is not None and "xG" in df.columns:
+    scatter = ax.scatter(df["x"] * 120, df["y"] * 80, c=df["xG"], cmap="Reds", edgecolors="black", s=80)
+    plt.colorbar(scatter, ax=ax, label="Expected Goals (xG)")
+else:
+    st.warning("Missing xG or positional columns.")
+
+
     
     st.pyplot(fig)
 
@@ -71,3 +75,14 @@ passing_data = load_passing_data()
 plot_passing_network(passing_data)
 
 st.success("Dashboard Loaded Successfully!")
+
+team_options = shot_data["team"].unique().tolist()
+selected_team = st.sidebar.selectbox("Select Team", team_options)
+shot_data = shot_data[shot_data["team"] == selected_team]
+
+tab1, tab2 = st.tabs(["📈 Shot Map (xG)", "🔄 Passing Network"])
+with tab1:
+    plot_shot_map(shot_data)
+with tab2:
+    plot_passing_network(passing_data)
+

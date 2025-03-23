@@ -34,3 +34,8 @@ def extract_shot_data():
 
 if __name__ == "__main__":
     extract_shot_data()
+    
+"body_part": event["shot"]["body_part"]["name"],
+"technique": event["shot"].get("technique", {}).get("name", "Unknown"),
+"under_pressure": event.get("under_pressure", False),
+
