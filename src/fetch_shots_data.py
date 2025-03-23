@@ -25,7 +25,10 @@ def extract_shot_data():
                 "y": event["location"][1],
                 "shot_distance": event["shot"]["end_location"][0] - event["location"][0],
                 "shot_angle": event["shot"]["end_location"][1] - event["location"][1],
-                "goal_scored": int(event["shot"]["outcome"]["name"] == "Goal")
+                "goal_scored": int(event["shot"]["outcome"]["name"] == "Goal"),
+                "body_part": event["shot"]["body_part"]["name"],
+                "technique": event["shot"].get("technique", {}).get("name", "Unknown"),
+                "under_pressure": event.get("under_pressure", False)
             })
 
     df = pd.DataFrame(shot_data)
@@ -34,8 +37,3 @@ def extract_shot_data():
 
 if __name__ == "__main__":
     extract_shot_data()
-    
-"body_part": event["shot"]["body_part"]["name"],
-"technique": event["shot"].get("technique", {}).get("name", "Unknown"),
-"under_pressure": event.get("under_pressure", False),
-

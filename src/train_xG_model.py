@@ -17,15 +17,17 @@ df = pd.read_csv(DATA_PATH)
 df["distance_squared"] = df["shot_distance"] ** 2
 df["angle_squared"] = df["shot_angle"] ** 2
 
-# Optional advanced features (if available)
+# Optional features
+features = ["shot_distance", "shot_angle", "distance_squared", "angle_squared"]
 if "under_pressure" in df.columns:
     df["under_pressure"] = df["under_pressure"].astype(int)
-    features = ["shot_distance", "shot_angle", "distance_squared", "angle_squared", "under_pressure"]
-else:
-    features = ["shot_distance", "shot_angle", "distance_squared", "angle_squared"]
+    features.append("under_pressure")
+if "body_part" in df.columns:
+    features.append("body_part")
+if "technique" in df.columns:
+    features.append("technique")
 
 target = "goal_scored"
-
 X = df[features]
 y = df[target]
 
@@ -50,10 +52,16 @@ preds = model.predict_proba(X_test)[:, 1]
 auc = roc_auc_score(y_test, preds)
 print(f"ROC AUC Score: {auc:.4f}")
 
-# Save Model and Metric
+# Predict xG for all
+xg_preds = model.predict_proba(X)[:, 1]
+df["xG"] = xg_preds
+
+# Save model & outputs
 os.makedirs("models", exist_ok=True)
 joblib.dump(model, MODEL_PATH)
+df.to_csv(DATA_PATH, index=False)
+
 with open(METRIC_PATH, "w") as f:
     f.write(f"ROC AUC Score: {auc:.4f}\n")
 
-print("Model and metrics saved successfully!")
+print("Model, xG predictions, and metrics saved successfully!")

@@ -1,5 +1,6 @@
 import os
 import pandas as pd
+from sklearn.preprocessing import LabelEncoder
 
 # Define Paths
 PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
@@ -15,11 +16,18 @@ if not os.path.exists(RAW_DATA_PATH):
 df = pd.read_csv(RAW_DATA_PATH)
 
 # Validate Required Columns
-required_columns = ["player", "team", "minute", "shot_distance", "shot_angle", "goal_scored"]
+required_columns = ["player", "team", "shot_distance", "shot_angle", "goal_scored"]
 missing_cols = [col for col in required_columns if col not in df.columns]
 if missing_cols:
     print(f"Error: Missing columns in dataset: {missing_cols}")
     exit()
+
+
+
+for col in ["body_part", "technique"]:
+    if col in df.columns:
+        encoder = LabelEncoder()
+        df[col] = encoder.fit_transform(df[col].astype(str))
 
 # Normalize & Scale Data
 df["shot_distance"] /= df["shot_distance"].max()

@@ -27,33 +27,29 @@ def load_passing_data():
 def plot_shot_map(df):
     pitch = Pitch(pitch_type="statsbomb", pitch_color="white", line_color="black")
     fig, ax = pitch.draw(figsize=(8, 5))
-    
-if df is not None and "xG" in df.columns:
-    scatter = ax.scatter(df["x"] * 120, df["y"] * 80, c=df["xG"], cmap="Reds", edgecolors="black", s=80)
-    plt.colorbar(scatter, ax=ax, label="Expected Goals (xG)")
-else:
-    st.warning("Missing xG or positional columns.")
 
+    if df is not None and {"x", "y", "xG"}.issubset(df.columns) and len(df) > 0:
+        scatter = ax.scatter(df["x"], df["y"], c=df["xG"], cmap="Reds", edgecolors="black", s=80)
+        plt.colorbar(scatter, ax=ax, label="Expected Goals (xG)")
+    else:
+        st.warning("No shots available for selected team or missing xG data.")
 
-    
     st.pyplot(fig)
 
 # Function to visualize passing network
 def plot_passing_network(df):
-    if df is None or not set(["passer", "receiver", "x", "y"]).issubset(df.columns):
-        st.warning("Passing data is missing required columns: 'passer', 'receiver', 'x', 'y'")
+    if df is None or not {"passer", "receiver", "x", "y"}.issubset(df.columns) or len(df) == 0:
+        st.warning("No passing data available for selected team or missing required columns.")
         return
 
     pitch = Pitch(pitch_type="statsbomb", pitch_color="white", line_color="black")
     fig, ax = pitch.draw(figsize=(8, 5))
 
     G = nx.DiGraph()
-    
     for _, row in df.iterrows():
         G.add_edge(row["passer"], row["receiver"], weight=row.get("pass_count", 1))
 
-    pos = {player: (row["x"] * 120, row["y"] * 80) for _, row in df.iterrows()}
-
+    pos = {row["passer"]: (row["x"], row["y"]) for _, row in df.iterrows()}
     node_sizes = [G.degree(n) * 100 for n in G.nodes()]
     edge_widths = [G[u][v]["weight"] / 2 for u, v in G.edges()]
 
@@ -63,26 +59,37 @@ def plot_passing_network(df):
 
     st.pyplot(fig)
 
-# Streamlit Dashboard
+# -----------------------------
+# Streamlit App Layout
+# -----------------------------
 st.title("⚽ Football Analytics Dashboard")
 
-st.subheader("Shot Data")
+# Load data
 shot_data = load_shot_data()
-plot_shot_map(shot_data)
-
-st.subheader("Passing Network")
 passing_data = load_passing_data()
-plot_passing_network(passing_data)
 
-st.success("Dashboard Loaded Successfully!")
+# Sidebar filter
+if shot_data is not None and "team" in shot_data.columns:
+    team_options = shot_data["team"].unique().tolist()
+    selected_team = st.sidebar.selectbox("Select Team", team_options)
+    shot_data = shot_data[shot_data["team"] == selected_team]
 
-team_options = shot_data["team"].unique().tolist()
-selected_team = st.sidebar.selectbox("Select Team", team_options)
-shot_data = shot_data[shot_data["team"] == selected_team]
+    if passing_data is not None and "team" in passing_data.columns:
+        passing_data = passing_data[passing_data["team"] == selected_team]
 
+    st.sidebar.markdown(f"🔍 **{selected_team}**")
+    st.sidebar.markdown(f"🎯 Shots: {len(shot_data)}")
+    st.sidebar.markdown(f"🔄 Passes: {len(passing_data) if passing_data is not None else 0}")
+
+# Tab layout
 tab1, tab2 = st.tabs(["📈 Shot Map (xG)", "🔄 Passing Network"])
+
 with tab1:
+    st.subheader("Shot Map with xG")
     plot_shot_map(shot_data)
+
 with tab2:
+    st.subheader("Passing Network")
     plot_passing_network(passing_data)
 
+st.success("Dashboard Loaded Successfully!")
