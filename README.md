@@ -29,10 +29,10 @@ Portfolio/
 │   │── train_xG_model.py    # Train xG model using XGBoost
 │   │── passing_network.py   # Analyze passing networks
 │   │── dashboard.py         # Streamlit dashboard
-│   │── requirements.txt     # Python dependencies
 │
 │── README.md             # Project documentation (this file)
 │── .gitignore            # Ignore unnecessary files (e.g., .csv, .pkl)
+│── requirements.txt     # Python dependencies
 ```
 
 ---
