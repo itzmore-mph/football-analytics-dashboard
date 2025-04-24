@@ -27,12 +27,24 @@ def main() -> None:
         df_shots = df_shots[df_shots["team"] == selected_team]
         if df_passes is not None and "team" in df_passes.columns:
             df_passes = df_passes[df_passes["team"] == selected_team]
-        # Display quick stats
         st.sidebar.markdown(
             f"🎯 Shots: {len(df_shots)}  🔄 Passes: {len(df_passes) if df_passes is not None else 0}"
         )
     else:
         st.sidebar.info("No shot data available to filter.")
+
+    # ─── NEW SIDEBAR CONTROLS FOR PASSING NETWORK ─────────────────────────
+    min_pass = st.sidebar.slider(
+        "Min passes between players",
+        1,
+        int(df_passes.pass_count.max() if df_passes is not None else 1),
+        2,
+    )
+    layout = st.sidebar.selectbox(
+        "Network layout", ["statsbomb", "spring", "circular"]
+    )
+    show_labels = st.sidebar.checkbox("Show all labels", value=False)
+    # ─────────────────────────────────────────────────────────────────────
 
     # Main tabs
     tab1, tab2 = st.tabs(["Shot Map (xG)", "Passing Network"])
@@ -48,11 +60,14 @@ def main() -> None:
     with tab2:
         st.subheader("Passing Network")
         try:
-            fig = plot_passing_network(df_passes)
+            # ─── PASS THE NEW ARGUMENTS INTO YOUR PLOTTING FUNCTION ─────────
+            fig = plot_passing_network(
+                df_passes,
+                min_pass=min_pass,
+                layout=layout,
+                show_labels=show_labels,
+            )
             st.pyplot(fig, use_container_width=True)
+            # ────────────────────────────────────────────────────────────────
         except Exception as e:
             st.warning(str(e))
-
-
-if __name__ == "__main__":
-    main()
