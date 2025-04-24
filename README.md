@@ -1,13 +1,17 @@
-# Football Analytics Portfolio: Expected Goals (xG) & Passing Networks
+# Football Analytics Portfolio
 
-## Project Overview
-This project applies **machine learning and data science** to football analytics, focusing on **expected goals (xG) modeling** and **passing network analysis**. The system fetches football event data, processes shot data, trains an xG model, and visualizes results using an **interactive Streamlit dashboard**.
+[![Streamlit](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://football-analytics-portfolio.streamlit.app/)
 
-### Features
-- **Expected Goals (xG) Model** → Predict shot quality using **XGBoost**.
-- **Passing Network Analysis** → Analyze team playstyles using **NetworkX**.
-- **Interactive Dashboard** → Visualize xG and passing networks in **Streamlit**.
-- **Automated Data Pipeline** → Fetch and process football event data.
+## Overview
+A brief elevator pitch—what problems you’re solving with expected outcomes.
+
+## Features
+- Expected goals (xG) model training and evaluation  
+- Interactive Streamlit dashboard for match-day analytics  
+- Data fetching & preprocessing pipeline  
+
+## Demo
+![Dashboard GIF](./dashboard.gif)
 
 ---
 
@@ -33,6 +37,7 @@ Portfolio/
 │── README.md             # Project documentation (this file)
 │── .gitignore            # Ignore unnecessary files (e.g., .csv, .pkl)
 │── requirements.txt     # Python dependencies
+│── dashboard.gif         # Dashboard Preview
 ```
 
 ---
