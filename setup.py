@@ -19,4 +19,10 @@ setup(
         "requests",
     ],
     python_requires=">=3.8",
+    entry_points={
+        "console_scripts": [
+            "football-dashboard=dashboard.app:main",
+            "football-pipeline=main:run_pipeline",
+        ],
+    },
 )
