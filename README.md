@@ -1,7 +1,5 @@
 # Football Analytics Portfolio
 
-[![CI](https://img.shields.io/github/actions/workflow/status/itzmore-mph/football-analytics-portfolio/ci.yml)
-[![Coverage](https://img.shields.io/codecov/c/github/itzmore-mph/football-analytics-portfolio)]
 [![Streamlit](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://football-analytics-portfolio.streamlit.app/)
 
 ## Overview
