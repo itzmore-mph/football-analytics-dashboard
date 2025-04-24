@@ -20,13 +20,16 @@ def plot_shot_map(df: Optional[pd.DataFrame]) -> plt.Figure:
     if df is None or not required.issubset(df.columns):
         raise ValueError("Invalid or missing shot data")
 
-    pitch = Pitch(pitch_type="statsbomb", pitch_color="white", line_color="black")
+    pitch = Pitch(
+        pitch_type="statsbomb", pitch_color="white", line_color="black"
+    )
     fig, ax = pitch.draw(figsize=(8, 5))
     scatter = ax.scatter(
         df["x"], df["y"], c=df["xG"], cmap="Reds", edgecolors="black", s=80
     )
     fig.colorbar(scatter, ax=ax, label="Expected Goals (xG)")
     return fig
+
 
 # Passing network plot
 Layout = Literal["statsbomb", "spring", "circular"]

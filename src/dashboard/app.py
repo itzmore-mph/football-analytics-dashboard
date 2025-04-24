@@ -28,7 +28,8 @@ def main() -> None:
         if df_passes is not None and "team" in df_passes.columns:
             df_passes = df_passes[df_passes["team"] == selected_team]
         st.sidebar.markdown(
-            f"🎯 Shots: {len(df_shots)}  🔄 Passes: {len(df_passes) if df_passes is not None else 0}"
+            f"🎯 Shots: {len(df_shots)}  "
+            f"🔄 Passes: {len(df_passes) if df_passes is not None else 0}"
         )
     else:
         st.sidebar.info("No shot data available to filter.")

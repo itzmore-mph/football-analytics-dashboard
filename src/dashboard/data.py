@@ -3,6 +3,7 @@ import os
 from typing import Optional
 import pandas as pd
 
+
 def load_shot_data(path: str) -> Optional[pd.DataFrame]:
     """Loads processed shot data from CSV.
 

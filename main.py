@@ -2,6 +2,8 @@
 import os
 import subprocess
 
+
+# Add an extra blank line to follow PEP 8
 def run_pipeline() -> None:
     """Orchestrate the full data pipeline: fetch, process, train."""
     print("Starting Football Analytics Pipeline…")
