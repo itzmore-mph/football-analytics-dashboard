@@ -1,5 +1,5 @@
 # src/dashboard/plots.py
-from typing import Optional, Literal
+from typing import Optional, Literal, Dict, Tuple
 import pandas as pd
 import matplotlib.pyplot as plt
 import networkx as nx
@@ -42,7 +42,7 @@ def plot_passing_network(
         df: DataFrame with ['passer','receiver','x','y','pass_count'].
         min_pass: only include edges where pass_count >= this.
         layout: "statsbomb" (use on-pitch coords), "spring", or "circular".
-        show_labels: draw every node label if True, otherwise only top‐5.
+        show_labels: draw every node label if True, otherwise only top-5.
     Raises:
         ValueError: if data is missing or no edges survive filtering.
     """
@@ -60,16 +60,40 @@ def plot_passing_network(
     for _, r in df.iterrows():
         G.add_edge(r.passer, r.receiver, weight=r.pass_count)
 
+    # prepare temporary pitch for axis limits
+    temp_pitch = Pitch(pitch_type="statsbomb", pitch_color="white", line_color="black")
+    _, temp_ax = temp_pitch.draw(figsize=(8, 5))
+    x0, x1 = temp_ax.get_xlim()
+    y0, y1 = temp_ax.get_ylim()
+
     # choose node positions
     if layout == "statsbomb":
-        pos: dict = {}
+        pos: Dict[str, Tuple[float, float]] = {}
         for _, r in df.iterrows():
             pos.setdefault(r.passer, (r.x, r.y))
             pos.setdefault(r.receiver, (r.x, r.y))
     elif layout == "spring":
         pos = nx.spring_layout(G, weight="weight", seed=42)
+        # rescale spring coords into pitch space
+        xs = [p[0] for p in pos.values()]
+        ys = [p[1] for p in pos.values()]
+        min_x, max_x = min(xs), max(xs)
+        min_y, max_y = min(ys), max(ys)
+        for node, (x, y) in pos.items():
+            norm_x = (x - min_x) / (max_x - min_x) if max_x > min_x else 0.5
+            norm_y = (y - min_y) / (max_y - min_y) if max_y > min_y else 0.5
+            pos[node] = (x0 + norm_x * (x1 - x0), y0 + norm_y * (y1 - y0))
     else:  # circular
         pos = nx.circular_layout(G)
+        # rescale circular coords into pitch space
+        xs = [p[0] for p in pos.values()]
+        ys = [p[1] for p in pos.values()]
+        min_x, max_x = min(xs), max(xs)
+        min_y, max_y = min(ys), max(ys)
+        for node, (x, y) in pos.items():
+            norm_x = (x - min_x) / (max_x - min_x) if max_x > min_x else 0.5
+            norm_y = (y - min_y) / (max_y - min_y) if max_y > min_y else 0.5
+            pos[node] = (x0 + norm_x * (x1 - x0), y0 + norm_y * (y1 - y0))
 
     # sizing
     deg = dict(G.degree(weight="weight"))
@@ -79,10 +103,8 @@ def plot_passing_network(
     # draw on a pitch
     pitch = Pitch(pitch_type="statsbomb", pitch_color="white", line_color="black")
     fig, ax = pitch.draw(figsize=(8, 5))
-    nx.draw_networkx_edges(G, pos, ax=ax,
-                           width=edge_widths, edge_color="black", alpha=0.6)
-    nx.draw_networkx_nodes(G, pos, ax=ax,
-                           node_size=node_sizes, node_color="steelblue", alpha=0.8)
+    nx.draw_networkx_edges(G, pos, ax=ax, width=edge_widths, edge_color="black", alpha=0.6)
+    nx.draw_networkx_nodes(G, pos, ax=ax, node_size=node_sizes, node_color="steelblue", alpha=0.8)
 
     # labels
     if show_labels:
@@ -93,9 +115,11 @@ def plot_passing_network(
         top5 = sorted(bet.items(), key=lambda x: x[1], reverse=True)[:5]
         for player, _ in top5:
             x, y = pos[player]
-            ax.text(x, y + 0.02, player,
-                    ha="center", fontsize=9,
-                    color="darkred", weight="bold")
+            ax.text(
+                x, y + 0.02, player,
+                ha="center", fontsize=9,
+                color="darkred", weight="bold"
+            )
 
     ax.set_title("Passing Network", pad=10)
     return fig

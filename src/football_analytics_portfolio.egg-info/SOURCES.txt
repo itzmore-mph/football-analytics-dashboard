@@ -7,5 +7,6 @@ src/dashboard/plots.py
 src/football_analytics_portfolio.egg-info/PKG-INFO
 src/football_analytics_portfolio.egg-info/SOURCES.txt
 src/football_analytics_portfolio.egg-info/dependency_links.txt
+src/football_analytics_portfolio.egg-info/entry_points.txt
 src/football_analytics_portfolio.egg-info/requires.txt
 src/football_analytics_portfolio.egg-info/top_level.txt
