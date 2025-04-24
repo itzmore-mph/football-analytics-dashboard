@@ -1,0 +1,19 @@
+Metadata-Version: 2.4
+Name: football_analytics_portfolio
+Version: 0.1.0
+Summary: A Streamlit-based football analytics dashboard and data pipeline
+Author: Your Name
+Requires-Python: >=3.8
+Requires-Dist: pandas
+Requires-Dist: numpy
+Requires-Dist: streamlit
+Requires-Dist: matplotlib
+Requires-Dist: networkx
+Requires-Dist: mplsoccer
+Requires-Dist: xgboost
+Requires-Dist: scikit-learn
+Requires-Dist: requests
+Dynamic: author
+Dynamic: requires-dist
+Dynamic: requires-python
+Dynamic: summary

@@ -1,0 +1,9 @@
+pandas
+numpy
+streamlit
+matplotlib
+networkx
+mplsoccer
+xgboost
+scikit-learn
+requests

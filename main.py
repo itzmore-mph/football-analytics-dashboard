@@ -1,5 +1,10 @@
 import os
 import subprocess
+from dashboard.app import main
+
+if __name__ == "__main__":
+    main()
+
 
 print("Starting Football Analytics Pipeline...")
 

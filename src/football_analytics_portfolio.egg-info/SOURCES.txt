@@ -1,0 +1,11 @@
+README.md
+setup.py
+src/dashboard/__init__.py
+src/dashboard/app.py
+src/dashboard/data.py
+src/dashboard/plots.py
+src/football_analytics_portfolio.egg-info/PKG-INFO
+src/football_analytics_portfolio.egg-info/SOURCES.txt
+src/football_analytics_portfolio.egg-info/dependency_links.txt
+src/football_analytics_portfolio.egg-info/requires.txt
+src/football_analytics_portfolio.egg-info/top_level.txt
