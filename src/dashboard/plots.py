@@ -1,9 +1,11 @@
 # src/dashboard/plots.py
 from typing import Optional, Literal, Dict, Tuple
 import pandas as pd
+import random
 import matplotlib.pyplot as plt
 import networkx as nx
 from mplsoccer import Pitch
+
 
 # Shot map plot
 def plot_shot_map(df: Optional[pd.DataFrame]) -> plt.Figure:
@@ -70,8 +72,10 @@ def plot_passing_network(
     if layout == "statsbomb":
         pos: Dict[str, Tuple[float, float]] = {}
         for _, r in df.iterrows():
-            pos.setdefault(r.passer, (r.x, r.y))
-            pos.setdefault(r.receiver, (r.x, r.y))
+            jitter_x = r.x + random.uniform(-1, 1)
+            jitter_y = r.y + random.uniform(-1, 1)
+            pos.setdefault(r.passer, (jitter_x, jitter_y))
+            pos.setdefault(r.receiver, (jitter_x, jitter_y))
     elif layout == "spring":
         pos = nx.spring_layout(G, weight="weight", seed=42)
         # rescale spring coords into pitch space
@@ -97,18 +101,25 @@ def plot_passing_network(
 
     # sizing
     deg = dict(G.degree(weight="weight"))
-    node_sizes = [deg[n] * 200 for n in G.nodes()]
-    edge_widths = [d["weight"] * 0.3 for (_, _, d) in G.edges(data=True)]
+    min_size, max_size = 50, 500
+    sizes = {n: deg[n] for n in G.nodes()}
+    max_deg = max(sizes.values(), default=1)
+    node_sizes = [
+        min_size + (max_size - min_size) * (sizes[n]**0.5 / max_deg**0.5)
+        for n in G.nodes()
+    ]
+    edge_widths = [d["weight"] * 0.2 for (_, _, d) in G.edges(data=True)]
 
     # draw on a pitch
     pitch = Pitch(pitch_type="statsbomb", pitch_color="white", line_color="black")
-    fig, ax = pitch.draw(figsize=(8, 5))
-    nx.draw_networkx_edges(G, pos, ax=ax, width=edge_widths, edge_color="black", alpha=0.6)
-    nx.draw_networkx_nodes(G, pos, ax=ax, node_size=node_sizes, node_color="steelblue", alpha=0.8)
+    fig, ax = Pitch(pitch_type="statsbomb", pitch_color="white", line_color="black").draw(figsize=(8, 5))
+    nx.draw_networkx_edges(G, pos, ax=ax, width=edge_widths, edge_color="gray", alpha=0.5)
+    nx.draw_networkx_nodes(G, pos, ax=ax, node_size=node_sizes, node_color="steelblue", alpha=0.6)
 
     # labels
     if show_labels:
-        nx.draw_networkx_labels(G, pos, ax=ax, font_size=8)
+        for node, (x, y) in pos.items():
+            ax.text(x, y + 1.5, node, fontsize=8, ha="center", va="bottom", color="black")
     else:
         # annotate only the top-5 players by betweenness
         bet = nx.betweenness_centrality(G, weight="weight")
@@ -120,6 +131,5 @@ def plot_passing_network(
                 ha="center", fontsize=9,
                 color="darkred", weight="bold"
             )
-
     ax.set_title("Passing Network", pad=10)
     return fig
