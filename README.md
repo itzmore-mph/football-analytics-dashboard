@@ -113,7 +113,7 @@ Contributions are welcome! Feel free to fork the repo and submit pull requests.
 
 ## 📬 Contact
 **👨‍💻 Moritz Philipp Haaf, BSc MA**  
-**📩 Email:** [moritz_haaf@outlook.com](mailto:moritz_haaf@outlook.com)  
+**📩 Email:** [itzmore.dev@gmail.com](mailto:itzmore.dev@gmail.com)  
 **🔗 GitHub:** [https://github.com/itzmore-mph](https://github.com/itzmore-mph)  
 **🔗 LinkedIn:** [https://linkedin.com/in/moritz-philipp-haaf/](https://linkedin.com/in/moritz-philipp-haaf/)  
 
