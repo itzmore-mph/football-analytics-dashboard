@@ -1,4 +1,4 @@
-# Football Analytics Portfolio
+# Football Analytics Dashboard
 
 [![Streamlit](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://football-analytics-portfolio.streamlit.app/)
 
