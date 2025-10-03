@@ -2,9 +2,6 @@
 
 [![Streamlit](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://football-analytics-portfolio.streamlit.app/)
 
-## Overview
-A brief elevator pitch—what problems you’re solving with expected outcomes.
-
 ## Features
 - Expected goals (xG) model training and evaluation  
 - Interactive Streamlit dashboard for match-day analytics  
