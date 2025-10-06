@@ -1,38 +1,46 @@
-import os
+"""
+Preprocessing-Schritt für xG:
+- Lädt shots_data.csv
+- (Kein Scaling hier!) reinigt/spiegelt Spaltennamen
+- Schreibt processed_shots.csv (vom Trainer konsumiert)
+"""
+from pathlib import Path
 import pandas as pd
-from sklearn.preprocessing import LabelEncoder
 
-# Define Paths
-PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
-RAW_DATA_PATH = os.path.join(PROJECT_ROOT, "../data/shots_data.csv")
-PROCESSED_DATA_PATH = os.path.join(PROJECT_ROOT, "../data/processed_shots.csv")
-
-# Ensure Data Exists
-if not os.path.exists(RAW_DATA_PATH):
-    print(f"Error: Missing raw data file: {RAW_DATA_PATH}")
-    exit()
-
-# Load Data
-df = pd.read_csv(RAW_DATA_PATH)
-
-# Validate Required Columns
-required_columns = ["player", "team", "shot_distance", "shot_angle", "goal_scored"]
-missing_cols = [col for col in required_columns if col not in df.columns]
-if missing_cols:
-    print(f"Error: Missing columns in dataset: {missing_cols}")
-    exit()
+ROOT = Path(__file__).resolve().parents[1]
+DATA = ROOT / "data"
+IN_CSV = DATA / "shots_data.csv"
+OUT_CSV = DATA / "processed_shots.csv"
 
 
+def main():
+    if not IN_CSV.exists():
+        print(f"Error: {IN_CSV} not found. Run fetch_shots_data.py first.")
+        return
+    df = pd.read_csv(IN_CSV)
 
-for col in ["body_part", "technique"]:
-    if col in df.columns:
-        encoder = LabelEncoder()
-        df[col] = encoder.fit_transform(df[col].astype(str))
+    # Minimal cleaning / schema guarantee
+    required = [
+        "shot_distance", "shot_angle", "goal_scored",
+        "x", "y", "team", "player"
+    ]
+    missing = [c for c in required if c not in df.columns]
+    if missing:
+        print(f"Warning: missing columns {missing} in {IN_CSV}")
 
-# Normalize & Scale Data
-df["shot_distance"] /= df["shot_distance"].max()
-df["shot_angle"] /= df["shot_angle"].max()
+    # Ensure dtypes
+    for c in ["shot_distance", "shot_angle", "x", "y"]:
+        if c in df.columns:
+            df[c] = pd.to_numeric(df[c], errors="coerce")
+    if "goal_scored" in df.columns:
+        df["goal_scored"] = df["goal_scored"].astype(int)
 
-# Save Processed Data
-df.to_csv(PROCESSED_DATA_PATH, index=False)
-print("Shot data preprocessed and saved successfully!")
+    # Optional: drop clear invalids
+    df = df.dropna(subset=["shot_distance", "shot_angle", "goal_scored"])
+
+    df.to_csv(OUT_CSV, index=False)
+    print(f"Wrote processed shots → {OUT_CSV}")
+
+
+if __name__ == "__main__":
+    main()

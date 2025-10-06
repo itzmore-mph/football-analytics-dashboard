@@ -1,51 +1,86 @@
+from pathlib import Path
 import json
-import pandas as pd
-import os
+import csv
 
-# Paths
-PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
-RAW_JSON_PATH = os.path.join(PROJECT_ROOT, "../data/15946.json")
-OUTPUT_CSV_PATH = os.path.join(PROJECT_ROOT, "../data/processed_passing_data.csv")
+ROOT = Path(__file__).resolve().parents[1]
+DATA_DIR = ROOT / "data"
 
-def extract_passing_data():
-    with open(RAW_JSON_PATH, "r", encoding="utf-8") as f:
-        data = json.load(f)
 
-    passing_data = []
-    for event in data:
-        if event["type"]["name"] == "Pass":
-            pass_event = {
-                "passer": event["player"]["name"],
-                "receiver": event["pass"].get("recipient", {}).get("name", None),
-                "team": event["team"]["name"],
-                "minute": event["minute"],
-                "second": event["second"],
-                "start_x": event["location"][0],
-                "start_y": event["location"][1],
-                "end_x": event["pass"]["end_location"][0],
-                "end_y": event["pass"]["end_location"][1],
-                "pass_length": event["pass"].get("length", None),
-                "pass_angle": event["pass"].get("angle", None),
-                "pass_outcome": event["pass"].get("outcome", {}).get("name", "Complete")
-            }
-            passing_data.append(pass_event)
+def _get(d, *keys, default=None):
+    cur = d
+    for k in keys:
+        if not isinstance(cur, dict) or k not in cur:
+            return default
+        cur = cur[k]
+    return cur
 
-    df = pd.DataFrame(passing_data)
-    df["x"] = (df["start_x"] + df["end_x"]) / 2
-    df["y"] = (df["start_y"] + df["end_y"]) / 2
 
-    grouped = df.groupby(["passer", "receiver"]).agg({
-        "x": "mean",
-        "y": "mean",
-        "pass_length": "mean",
-        "pass_angle": "mean",
-        "pass_outcome": lambda x: (x == "Complete").sum(),
-        "team": "first",
-        "minute": "count"
-    }).rename(columns={"minute": "pass_count"}).reset_index()
+def main(match_id: int = 15946):
+    events_path = DATA_DIR / f"{match_id}.json"
+    out_path = DATA_DIR / "passing_data.csv"
 
-    grouped.to_csv(OUTPUT_CSV_PATH, index=False)
-    print("Passing data extracted and saved to processed_passing_data.csv")
+    if not events_path.exists():
+        raise FileNotFoundError(
+            f"{events_path} not found. Run fetch_statsbomb.py first."
+        )
+
+    with events_path.open("r", encoding="utf-8") as f:
+        events = json.load(f)
+
+    rows = []
+    for e in events:
+        if _get(e, "type", "name") != "Pass":
+            continue
+
+        start = e.get("location")
+        end = _get(e, "pass", "end_location")
+        if not (isinstance(start, list) and len(start) >= 2):
+            continue
+        if not (isinstance(end, list) and len(end) >= 2):
+            continue
+
+        passer = _get(e, "player", "name")
+        receiver = _get(e, "pass", "recipient", "name")
+        if not receiver:
+            continue
+
+        team_passer = _get(e, "team", "name")
+        team_receiver = _get(e, "pass", "recipient", "team", "name")
+
+        rows.append({
+            "match_id": match_id,
+            "minute": e.get("minute"),
+            "second": e.get("second"),
+            "passer": passer,
+            "receiver": receiver,
+            "team_passer": team_passer,
+            "team_receiver": team_receiver,
+            "start_x": float(start[0]),
+            "start_y": float(start[1]),
+            "end_x": float(end[0]),
+            "end_y": float(end[1]),
+            # default node position (receiver position)
+            "x": float(end[0]),
+            "y": float(end[1]),
+        })
+
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
+
+    fieldnames = [
+        "match_id", "minute", "second",
+        "passer", "receiver",
+        "team_passer", "team_receiver",
+        "start_x", "start_y", "end_x", "end_y",
+        "x", "y",
+    ]
+    with out_path.open("w", newline="", encoding="utf-8") as f:
+        writer = csv.DictWriter(f, fieldnames=fieldnames)
+        writer.writeheader()
+        if rows:
+            writer.writerows(rows)
+
+    print(f"Wrote {len(rows)} passes → {out_path}")
+
 
 if __name__ == "__main__":
-    extract_passing_data()
+    main()

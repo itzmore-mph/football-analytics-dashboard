@@ -11,12 +11,12 @@ def run_pipeline() -> None:
     scripts = [
         "fetch_statsbomb.py",
         "fetch_shots_data.py",
-        "fetch_passing_data.py",
+        "fetch_passing_data.py",   # now exists
         "preprocess_xG.py",
         "train_xG_model.py",
     ]
 
-    base_dir = os.path.join(os.path.dirname(__file__), "src")
+    base_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "src")
     for script in scripts:
         script_path = os.path.join(base_dir, script)
         print(f"▶ Running {script}…")
@@ -27,7 +27,7 @@ def run_pipeline() -> None:
 
     print("Data pipeline completed successfully!")
     print("You can now run the dashboard with:")
-    print("    streamlit run src/dashboard/app.py")
+    print(" streamlit run streamlit_app.py")
 
 
 if __name__ == "__main__":

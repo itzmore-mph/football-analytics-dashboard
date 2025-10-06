@@ -4,8 +4,8 @@ __pycache__/
 *.so
 
 # Ignore Virtual Environment
-venv/
-env/
+.venv/
+.env/
 *.env
 
 # Ignore Jupyter Notebook Checkpoints
@@ -23,6 +23,7 @@ models/*.pkl
 models/*.h5
 models/*.joblib
 models/*.sav
+models/
 
 # Ignore Logs and Cache
 logs/

@@ -1,75 +1,116 @@
-import os
+from __future__ import annotations
+from pathlib import Path
 import pandas as pd
 import networkx as nx
-import matplotlib.pyplot as plt
 from mplsoccer import Pitch
 
-data_path = "data/passing_data.csv"
+ROOT = Path(__file__).resolve().parents[1]
+DATA_PATH = ROOT / "data" / "passing_data.csv"
 
-def load_data():
-    if not os.path.exists(data_path):
-        print(f"Error: Data file {data_path} not found.")
+
+def load_data(path: Path = DATA_PATH) -> pd.DataFrame | None:
+    if not path.exists():
+        print(f"Error: Data file {path} not found.")
         return None
-    
-    df = pd.read_csv(data_path)
-    required_columns = {'passer', 'receiver', 'x', 'y'}
-    
-    if not required_columns.issubset(df.columns):
-        print(f"Error: Passing data is missing required columns: {required_columns - set(df.columns)}")
+    df = pd.read_csv(path)
+    required = {"passer", "receiver", "x", "y"}
+    missing = required - set(df.columns)
+    if missing:
+        print(f"Error: Passing data is missing required columns: {missing}")
         return None
-    
+    df = df.dropna(subset=["passer", "receiver", "x", "y"]).copy()
+    df = df.query("0 <= x <= 120 and 0 <= y <= 80").copy()
     return df
 
-def create_passing_network(df):
+
+def _mean_positions(df: pd.DataFrame) -> dict[str, tuple[float, float]]:
+    has_end = {"end_x", "end_y"}.issubset(df.columns)
+    start_x_col = "start_x" if "start_x" in df.columns else "x"
+    start_y_col = "start_y" if "start_y" in df.columns else "y"
+    start_pos = df.groupby("passer")[[start_x_col, start_y_col]].mean()
+    start_pos.columns = ["sx", "sy"]
+    if has_end:
+        recv_pos = df.groupby("receiver")[["end_x", "end_y"]].mean()
+        recv_pos.columns = ["rx", "ry"]
+        players = pd.Index(sorted(set(df["passer"]) | set(df["receiver"])))
+        pos = pd.DataFrame(index=players).join(start_pos, how="left").join(recv_pos, how="left")
+        pos["x"] = pos[["sx", "rx"]].mean(axis=1, skipna=True)
+        pos["y"] = pos[["sy", "ry"]].mean(axis=1, skipna=True)
+    else:
+        players = pd.Index(sorted(set(df["passer"]) | set(df["receiver"])))
+        pos = pd.DataFrame(index=players).join(start_pos, how="left")
+        pos["x"] = pos["sx"]
+        pos["y"] = pos["sy"]
+    pos["x"] = pos["x"].fillna(60.0)
+    pos["y"] = pos["y"].fillna(40.0)
+    return {p: (float(pos.at[p, "x"]), float(pos.at[p, "y"])) for p in pos.index}
+
+
+def create_passing_network(df: pd.DataFrame, *, same_team_only: bool = True, min_passes: int = 2) -> nx.DiGraph:
+    team_p_col = "team_passer" if "team_passer" in df.columns else ("team" if "team" in df.columns else None)
+    team_r_col = "team_receiver" if "team_receiver" in df.columns else ("team" if "team" in df.columns else None)
+    if same_team_only and team_p_col and team_r_col:
+        df = df[df[team_p_col] == df[team_r_col]].copy()
+
+    edges = (
+        df.groupby(["passer", "receiver"])
+        .size()
+        .reset_index(name="weight")
+        .query("receiver == receiver")
+    )
+    if min_passes > 1:
+        edges = edges[edges["weight"] >= min_passes]
+
     G = nx.DiGraph()
-    
-    for _, row in df.iterrows():
-        passer, receiver = row['passer'], row['receiver']
-        x, y = row['x'], row['y']
-        
-        if not G.has_node(passer):
-            G.add_node(passer, pos=(x, y))
-        
-        if not G.has_node(receiver):
-            G.add_node(receiver, pos=(x + 5, y))  # Slight offset for better visibility
-        
-        if G.has_edge(passer, receiver):
-            G[passer][receiver]['weight'] += 1
-        else:
-            G.add_edge(passer, receiver, weight=1)
-    
+    positions = _mean_positions(df)
+    for player, (px, py) in positions.items():
+        G.add_node(player, pos=(px, py))
+
+    for _, row in edges.iterrows():
+        passer = row["passer"]
+        receiver = row["receiver"]
+        w = float(row["weight"])
+        if passer == receiver:
+            continue
+        if not G.has_node(passer) or not G.has_node(receiver):
+            continue
+        G.add_edge(passer, receiver, weight=w)
+
     return G
 
-def plot_passing_network(G):
-    pitch = Pitch(pitch_type='statsbomb', line_color='black')
+
+def plot_passing_network(G: nx.DiGraph, *, title: str = "Passing Network", edge_scale: float = 0.35, node_scale: float = 3000.0):
+    pitch = Pitch(pitch_type="statsbomb", line_color="black")
     fig, ax = pitch.draw(figsize=(10, 6))
-    
-    pos = nx.get_node_attributes(G, 'pos')
-    node_sizes = [G.degree(n) * 150 for n in G.nodes()]
-    
-    nx.draw_networkx_nodes(G, pos, ax=ax, node_size=node_sizes, node_color='blue', alpha=0.7)
-    nx.draw_networkx_labels(G, pos, ax=ax, font_size=8, font_color='white', font_weight='bold')
-    
-    edges = G.edges(data=True)
-    edge_widths = [0.5 + (d['weight'] * 0.3) for (_, _, d) in edges]
-    
-    nx.draw_networkx_edges(G, pos, ax=ax, edge_color='black', width=edge_widths, alpha=0.6)
-    
-    plt.title("Passing Network", fontsize=14, fontweight='bold')
-    plt.show()
+    pos = nx.get_node_attributes(G, "pos")
+    if G.number_of_edges() > 0:
+        centrality = nx.betweenness_centrality(G, weight="weight", normalized=True)
+    else:
+        centrality = {n: 0.0 for n in G.nodes()}
+    node_sizes = []
+    for n in G.nodes():
+        c = max(centrality.get(n, 0.0), 0.01)
+        node_sizes.append(c * node_scale)
+
+    nx.draw_networkx_labels(G, pos, ax=ax, font_size=8, font_color="white", font_weight="bold")
+    nx.draw_networkx_nodes(G, pos, ax=ax, node_size=node_sizes, alpha=0.8)
+    widths = [0.5 + edge_scale * float(d.get("weight", 1.0)) for _, _, d in G.edges(data=True)]
+    nx.draw_networkx_edges(G, pos, ax=ax, width=widths, alpha=0.6, arrows=False)
+    ax.set_title(title, fontsize=14, fontweight="bold")
+    return fig
+
 
 def main():
     df = load_data()
-    if df is None:
+    if df is None or df.empty:
         print("Passing network not available.")
         return
-    
-    G = create_passing_network(df)
-    plot_passing_network(G)
+    G = create_passing_network(df, same_team_only=True, min_passes=2)
+    fig = plot_passing_network(G, title="Passing Network (min 2 passes)")
+    out_path = DATA_PATH.with_suffix(".png")
+    fig.savefig(out_path, dpi=200, bbox_inches="tight")
+    print(f"Saved network figure → {out_path}")
+
 
 if __name__ == "__main__":
     main()
-
-centrality = nx.betweenness_centrality(G, weight="weight")
-# Use centrality to scale node sizes
-node_sizes = [centrality.get(n, 0.01) * 3000 for n in G.nodes()]
