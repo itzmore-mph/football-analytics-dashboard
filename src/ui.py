@@ -2,19 +2,27 @@ from .fetch_statsbomb import fetch_competitions, fetch_matches, fetch_events
 import pandas as pd
 import streamlit as st
 from pathlib import Path
+import os
 import subprocess, sys
 
 def _run_py(script: Path):
-    res = subprocess.run([sys.executable, str(script)], capture_output=True, text=True)
+    env = os.environ.copy()
+    env["PYTHONIOENCODING"] = "utf-8"   # <<— wichtig auf Windows
+    res = subprocess.run(
+        [sys.executable, str(script)],
+        capture_output=True,
+        text=True,
+        env=env,
+    )
     if res.returncode != 0:
         st.error(res.stderr or "Unknown error")
     elif res.stdout:
-        st.code(res.stdout)
+        st.code(res.stdout, language="bash")
 
 def render_dashboard(root: Path):
-    st.title("⚽ Football Analytics Dashboard")
+    st.title("Football Analytics Dashboard")
 
-    with st.expander("🔁 Match wählen (Open Data) & Pipeline neu bauen"):
+    with st.expander("Match wählen (Open Data) & Pipeline neu bauen"):
         # 1) Competitions laden
         fetch_competitions()
         comps = pd.read_json(root / "data" / "competitions.json")
@@ -51,5 +59,5 @@ def render_dashboard(root: Path):
                 # Preprocess + Train
                 _run_py(root / "src" / "preprocess_xG.py")
                 _run_py(root / "src" / "train_xG_model.py")
-            st.success("Pipeline aktualisiert ✅")
-            st.experimental_rerun()
+            st.success("Pipeline aktualisiert")
+            st.rerun()
