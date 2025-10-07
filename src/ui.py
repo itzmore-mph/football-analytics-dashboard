@@ -246,7 +246,7 @@ def render_dashboard(root: Path) -> None:
                     from mplsoccer import Pitch  # heavy import; inside try
 
                     pitch = Pitch(pitch_type="statsbomb", line_color="black")
-                    fig, ax = pitch.draw(figsize=(10, 6))
+                    fig, ax = pitch.draw(figsize=(7, 4.5))
                     size = (xg_series.clip(0, 0.8) * 500) + 18
                     goal_colors = (
                         df_filtered["goal_scored"]
@@ -334,8 +334,8 @@ def render_dashboard(root: Path) -> None:
 
             # --- build / plot ---
             G = create_passing_network(dfp, same_team_only=True, min_passes=min_passes)
-            fig = plot_passing_network(G, title=f"Passing Network (≥{min_passes} passes)")
-            st.pyplot(fig, clear_figure=True)
+            fig = plot_passing_network(G, title=f"Passing Network (≥{min_passes} passes)", figsize=(7, 4.5))
+            st.pyplot(fig, clear_figure=True, use_container_width=False)
             passes_mtime = max(_file_mtime(passes_path), _file_mtime(fallback_passes))
             st.caption(f"Passing data last updated: {_format_timestamp(passes_mtime)}")
 
