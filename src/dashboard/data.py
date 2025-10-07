@@ -22,7 +22,7 @@ def load_passing_data(path: str) -> Optional[pd.DataFrame]:
     """Loads processed passing data from CSV.
 
     Args:
-        path: Path to the processed_passing_data.csv file.
+        path: Path to the passing_data.csv file.
     Returns:
         A DataFrame if the file exists and is non-empty; otherwise None.
     """

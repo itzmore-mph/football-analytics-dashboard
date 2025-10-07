@@ -187,7 +187,7 @@ plt.close()
 df["xg_bucket"] = pd.cut(
     df["xG"],
     bins=[0, 0.05, 0.10, 0.20, 0.30, 1.0],
-    labels=["0-0.05", "0.050.10", "0.10-0.20", "0.20-0.30", "0.30+"],
+    labels=["0-0.05", "0.05-0.10", "0.10-0.20", "0.20-0.30", "0.30+"],
     include_lowest=True,
 )
 df.groupby("xg_bucket")["goal_scored"].agg(["mean", "count"]).reset_index().to_csv(

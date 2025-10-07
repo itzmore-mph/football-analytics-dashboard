@@ -17,7 +17,7 @@
 ## Project Structure
 
 ```plaintext
-Portfolio/
+football-analytics-dashboard/
 │── data/                 # Raw & processed datasets
 │   │── 15946.json        # Raw match event data
 │   │── shots_data.csv    # Extracted shot data
@@ -48,8 +48,8 @@ Portfolio/
 ### 1️⃣ Clone the Repository
 
 ```bash
-git clone https://github.com/YOUR_GITHUB_USERNAME/football-analytics-portfolio.git
-cd football-analytics-portfolio
+git clone https://github.com/YOUR_GITHUB_USERNAME/football-analytics-dashboard.git
+cd football-analytics-dashboard
 ```
 
 ### 2️⃣ Create a Virtual Environment
