@@ -15,11 +15,5 @@ def list_matches(competition_id: int, season_id: int) -> pd.DataFrame:
         return pd.DataFrame(json.load(f))
 
 def ensure_open_data_files():
-    """
-    This assumes you've already run a fetcher that downloads:
-      - competitions.json
-      - matches_<comp>_<season>.json
-      - events_<match_id>.json  (or 15946.json as your default)
-    If you prefer, swap to statsbombpy to fetch on demand.
-    """
+    """Ensure the data directory exists."""
     DATA.mkdir(parents=True, exist_ok=True)

@@ -148,7 +148,7 @@ else:
 calibrator.fit(X_train_t, y_train)
 
 proba_cal = calibrator.predict_proba(X_test_t)[:, 1]
-auc_cal   = roc_auc_score(y_test, proba_cal)
+auc_cal = roc_auc_score(y_test, proba_cal)
 brier_cal = brier_score_loss(y_test, proba_cal)
 
 # ---------- xG für alle ----------
@@ -187,7 +187,7 @@ plt.close()
 df["xg_bucket"] = pd.cut(
     df["xG"],
     bins=[0, 0.05, 0.10, 0.20, 0.30, 1.0],
-    labels=["0–0.05", "0.05–0.10", "0.10–0.20", "0.20–0.30", "0.30+"],
+    labels=["0-0.05", "0.050.10", "0.10-0.20", "0.20-0.30", "0.30+"],
     include_lowest=True,
 )
 df.groupby("xg_bucket")["goal_scored"].agg(["mean", "count"]).reset_index().to_csv(
@@ -195,7 +195,9 @@ df.groupby("xg_bucket")["goal_scored"].agg(["mean", "count"]).reset_index().to_c
 )
 
 # ---------- Speichern ----------
-calibrated_pipeline = SkPipeline(steps=[("prep", preprocess), ("calibrated_clf", calibrator)])
+calibrated_pipeline = SkPipeline(steps=[("prep", preprocess),
+                                        ("calibrated_clf", calibrator)
+                                        ])
 joblib.dump(calibrated_pipeline, MODEL_PATH)
 FEATURES_PATH.write_text("\n".join(features), encoding="utf-8")
 df.to_csv(DATA_PATH, index=False)
@@ -214,7 +216,8 @@ with open(METRIC_PATH, "w", encoding="utf-8") as f:
         f"xgboost version     : {xgb.__version__}\n"
     )
 
-print("Saved calibrated xG pipeline, metrics, calibration plot, buckets, and updated processed_shots.csv")
+# ---------- Output ----------
+print("Training complete. Summary:")
 print(f"Model:        {MODEL_PATH}")
 print(f"Metrics:      {METRIC_PATH}")
 print(f"Reliability:  {RELIABILITY_PATH}")

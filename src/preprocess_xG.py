@@ -1,9 +1,5 @@
-"""
-Preprocessing-Schritt für xG:
-- Lädt shots_data.csv
-- (Kein Scaling hier!) reinigt/spiegelt Spaltennamen
-- Schreibt processed_shots.csv (vom Trainer konsumiert)
-"""
+# Preprocess raw shot data for xG modeling
+
 from pathlib import Path
 import pandas as pd
 
@@ -39,7 +35,7 @@ def main():
     df = df.dropna(subset=["shot_distance", "shot_angle", "goal_scored"])
 
     df.to_csv(OUT_CSV, index=False)
-    print(f"Wrote processed shots → {OUT_CSV}")
+    print(f"Wrote processed shots: {OUT_CSV}")
 
 
 if __name__ == "__main__":

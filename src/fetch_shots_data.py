@@ -97,7 +97,7 @@ def extract_shot_data(match_id: int = 15946):
 
     SHOTS_DATA_PATH.parent.mkdir(parents=True, exist_ok=True)
     df.to_csv(SHOTS_DATA_PATH, index=False)
-    print(f"Wrote {len(df)} shots → {SHOTS_DATA_PATH}")
+    print(f"Wrote {len(df)} shots: {SHOTS_DATA_PATH}")
 
 
 if __name__ == "__main__":

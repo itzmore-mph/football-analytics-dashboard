@@ -79,7 +79,7 @@ def main(match_id: int = 15946):
         if rows:
             writer.writerows(rows)
 
-    print(f"Wrote {len(rows)} passes → {out_path}")
+    print(f"Wrote {len(rows)} passes: {out_path}")
 
 
 if __name__ == "__main__":
