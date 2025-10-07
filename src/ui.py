@@ -57,13 +57,20 @@ def _read_json(path: Path) -> pd.DataFrame:
     return pd.read_json(path)
 
 
+# add helper
+def _file_mtime(p: Path) -> float:
+    try:
+        return p.stat().st_mtime
+    except FileNotFoundError:
+        return 0.0
+
+
 @st.cache_data
-def _load_shots_df(root: Path) -> pd.DataFrame:
+def _load_shots_df(root: Path, mtime: float) -> pd.DataFrame:
     p = root / "data" / "processed_shots.csv"
     if not p.exists():
         return pd.DataFrame()
     df = pd.read_csv(p)
-    # minimal schema-guard
     needed = {"x", "y", "goal_scored"}
     if not needed.issubset(df.columns):
         return pd.DataFrame()
@@ -124,6 +131,7 @@ def render_dashboard(root: Path) -> None:
                 _run_py(root / "src" / "train_xG_model.py")
 
             st.success("Pipeline updated.")
+            st.cache_data.clear()
             st.rerun()
 
     # --------- TABS ---------
@@ -131,7 +139,8 @@ def render_dashboard(root: Path) -> None:
 
     # Tab 1: Shot Map
     with tabs[0]:
-        df_shots = _load_shots_df(root)
+        shots_path = root / "data" / "processed_shots.csv"
+        df_shots = _load_shots_df(root, _file_mtime(shots_path))
         if df_shots.empty:
             st.info("No shots available yet. Please run the pipeline.")
         else:
@@ -140,7 +149,7 @@ def render_dashboard(root: Path) -> None:
 
                 pitch = Pitch(pitch_type="statsbomb", line_color="black")
                 fig, ax = pitch.draw(figsize=(10, 6))
-                size = df_shots.get("xG", pd.Series([0] * len(df_shots))) * 600 + 10
+                size = (df_shots.get("xG", pd.Series([0]*len(df_shots))).clip(0, 0.8) * 500) + 18
                 ax.scatter(df_shots["x"], df_shots["y"], s=size, alpha=0.65)
                 ax.set_title("Shot Map (Bubble size = xG)")
                 st.pyplot(fig, clear_figure=True)

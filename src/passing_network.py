@@ -81,23 +81,30 @@ def create_passing_network(df: pd.DataFrame, *, same_team_only: bool = True, min
     return G
 
 
-def plot_passing_network(G: nx.DiGraph, *, title: str = "Passing Network", edge_scale: float = 0.35, node_scale: float = 3000.0):
+def plot_passing_network(
+    G: nx.DiGraph,
+    *,
+    title: str = "Passing Network",
+    edge_scale: float = 0.25,
+    node_scale: float = 2200.0,
+    figsize: tuple[float, float] = (8, 5)   # <— smaller
+):
     pitch = Pitch(pitch_type="statsbomb", line_color="black")
-    fig, ax = pitch.draw(figsize=(10, 6))
+    fig, ax = pitch.draw(figsize=figsize)    # <— use new size
     pos = nx.get_node_attributes(G, "pos")
-    if G.number_of_edges() > 0:
-        centrality = nx.betweenness_centrality(G, weight="weight", normalized=True)
-    else:
-        centrality = {n: 0.0 for n in G.nodes()}
-    node_sizes = []
-    for n in G.nodes():
-        c = max(centrality.get(n, 0.0), 0.01)
-        node_sizes.append(c * node_scale)
 
+    centrality = (
+        nx.betweenness_centrality(G, weight="weight", normalized=True)
+        if G.number_of_edges() > 0 else {n: 0.0 for n in G.nodes()}
+    )
+
+    node_sizes = [max(centrality.get(n, 0.0), 0.01) * node_scale for n in G.nodes()]
     nx.draw_networkx_labels(G, pos, ax=ax, font_size=8, font_color="white", font_weight="bold")
     nx.draw_networkx_nodes(G, pos, ax=ax, node_size=node_sizes, alpha=0.8)
-    widths = [0.5 + edge_scale * float(d.get("weight", 1.0)) for _, _, d in G.edges(data=True)]
+
+    widths = [0.4 + edge_scale * float(d.get("weight", 1.0)) for _, _, d in G.edges(data=True)]
     nx.draw_networkx_edges(G, pos, ax=ax, width=widths, alpha=0.6, arrows=False)
+
     ax.set_title(title, fontsize=14, fontweight="bold")
     return fig
 
