@@ -10,19 +10,30 @@ ROOT = Path(__file__).resolve().parents[1]
 DATA_PATH = ROOT / "data" / "passing_data.csv"
 
 
+def _candidate_paths(path: Path) -> list[Path]:
+    candidates = [path]
+    fallback = path.with_name("processed_passing_data.csv")
+    if fallback not in candidates:
+        candidates.append(fallback)
+    return candidates
+
+
 def load_data(path: Path = DATA_PATH) -> pd.DataFrame | None:
-    if not path.exists():
-        print(f"Error: Data file {path} not found.")
-        return None
-    df = pd.read_csv(path)
-    required = {"passer", "receiver", "x", "y"}
-    missing = required - set(df.columns)
-    if missing:
-        print(f"Error: Passing data is missing required columns: {missing}")
-        return None
-    df = df.dropna(subset=["passer", "receiver", "x", "y"]).copy()
-    df = df.query("0 <= x <= 120 and 0 <= y <= 80").copy()
-    return df
+    for candidate in _candidate_paths(path):
+        if not candidate.exists():
+            continue
+        df = pd.read_csv(candidate)
+        required = {"passer", "receiver", "x", "y"}
+        missing = required - set(df.columns)
+        if missing:
+            print(f"Error: Passing data is missing required columns: {missing}")
+            return None
+        df = df.dropna(subset=["passer", "receiver", "x", "y"]).copy()
+        df = df.query("0 <= x <= 120 and 0 <= y <= 80").copy()
+        print(f"Loaded passing data from {candidate}")
+        return df
+    print(f"Error: Data file {path} not found.")
+    return None
 
 
 def _mean_positions(df: pd.DataFrame) -> dict[str, tuple[float, float]]:

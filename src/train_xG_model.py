@@ -95,8 +95,8 @@ preprocess = ColumnTransformer(
 
 # Fit nur auf Train; transformiere Split + All
 X_train_t = preprocess.fit_transform(X_train)
-X_test_t  = preprocess.transform(X_test)
-X_all_t   = preprocess.transform(X)
+X_test_t = preprocess.transform(X_test)
+X_all_t = preprocess.transform(X)
 
 # ---------- XGBoost (schnell + stabil + imbalance-aware) ----------
 pos = y_train.sum()
@@ -137,7 +137,7 @@ except TypeError:
 
 # ---------- Evaluation (uncalibrated) ----------
 proba_uncal = base_model.predict_proba(X_test_t)[:, 1]
-auc_uncal   = roc_auc_score(y_test, proba_uncal)
+auc_uncal = roc_auc_score(y_test, proba_uncal)
 brier_uncal = brier_score_loss(y_test, proba_uncal)
 
 # ---------- Kalibrierung (Isotonic) ----------

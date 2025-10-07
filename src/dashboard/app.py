@@ -2,10 +2,7 @@
 from __future__ import annotations
 from pathlib import Path
 import streamlit as st
-
-# Wichtig: NICHT wieder src.dashboard.app importieren!
-# Wir brauchen nur die UI-Funktion aus src/ui.py
-from src.ui import render_dashboard  # noqa: E402
+from src.ui import render_dashboard
 
 
 def main() -> None:
