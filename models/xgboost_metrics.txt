@@ -1,10 +1,10 @@
-Uncalibrated  ROC AUC: 0.0000
-Uncalibrated  Brier  : 0.3712
-Calibrated    ROC AUC: 0.3750
-Calibrated    Brier  : 0.4000
+Uncalibrated  ROC AUC: nan
+Uncalibrated  Brier  : 0.0133
+Calibrated    ROC AUC: nan
+Calibrated    Brier  : 0.0000
 Reliability CSV     : xgboost_reliability.csv
 Calibration Plot    : xg_calibration.png
 xG Buckets          : xg_buckets.csv
-scale_pos_weight    : 5.667
+scale_pos_weight    : 10.000
 sklearn version     : 1.7.2
 xgboost version     : 3.0.5
