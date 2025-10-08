@@ -9,13 +9,19 @@ from pathlib import Path
 import pandas as pd
 import streamlit as st
 
-from .fetch_statsbomb import fetch_competitions, fetch_matches, fetch_events
+from .fetch_statsbomb import (
+    fetch_competitions,
+    fetch_matches,
+    fetch_events,
+    StatsBombFetchError,
+)
 from .dashboard import (
     make_shot_map_plotly,
     make_passing_network_plotly,
     build_network_tables,
 )
 from .passing_network import load_data as load_passes_csv
+from .validation import validate_shots, sample_size_warning
 
 # ---------- helpers ----------
 
@@ -68,7 +74,9 @@ def _file_mtime(p: Path) -> float:
 
 
 @st.cache_data
-def _load_shots_df(root: Path, mtime: float | None = None) -> pd.DataFrame:
+def _load_shots_df(
+    root: Path, mtime: float | None = None
+) -> tuple[pd.DataFrame, list[str]]:
     """
     Cached loader for processed_shots.csv.
     If mtime is None we compute it, so old call sites still work.
@@ -79,12 +87,16 @@ def _load_shots_df(root: Path, mtime: float | None = None) -> pd.DataFrame:
     _ = mtime
 
     if not csv_path.exists():
-        return pd.DataFrame()
+        return pd.DataFrame(), []
     df = pd.read_csv(csv_path)
     needed = {"x", "y", "goal_scored"}
     if not needed.issubset(df.columns):
-        return pd.DataFrame()
-    return df
+        return pd.DataFrame(), [
+            "processed_shots.csv missing columns: "
+            + ", ".join(sorted(needed - set(df.columns)))
+        ]
+    validated = validate_shots(df)
+    return validated.frame, validated.issues
 
 
 def _minute_range(df: pd.DataFrame) -> tuple[int, int]:
@@ -102,7 +114,15 @@ def render_dashboard(root: Path) -> None:
 
     with st.expander("Pick a Match", expanded=False):
         # 1) Competitions
-        fetch_competitions()
+        try:
+            fetch_competitions()
+        except StatsBombFetchError as exc:
+            st.error(
+                "Unable to download competitions from StatsBomb open data. "
+                "Please check your internet connection or proxy settings."
+            )
+            st.caption(str(exc))
+            st.stop()
         comps = _read_json(root / "data" / "competitions.json")
         if comps.empty:
             st.warning("Could not load competitions.json.")
@@ -118,7 +138,14 @@ def render_dashboard(root: Path) -> None:
         season_id = int(sel.season_id)
 
         # 2) Matches
-        fetch_matches(comp_id, season_id)
+        try:
+            fetch_matches(comp_id, season_id)
+        except StatsBombFetchError as exc:
+            st.error(
+                "Unable to download matches for the selected competition."
+            )
+            st.caption(str(exc))
+            st.stop()
         matches = _read_json(
             root / "data" / "matches" / str(comp_id) / f"{season_id}.json"
         )
@@ -135,7 +162,14 @@ def render_dashboard(root: Path) -> None:
         # 3) Trigger pipeline
         if st.button("Update Dashboard", use_container_width=True):
             with st.spinner(f"Load events for match_id={match_id} ..."):
-                fetch_events(match_id, force=True)
+                try:
+                    fetch_events(match_id, force=True)
+                except StatsBombFetchError as exc:
+                    st.error(
+                        "Unable to download match events. Please retry later."
+                    )
+                    st.caption(str(exc))
+                    st.stop()
 
                 # Late imports
                 from .fetch_shots_data import extract_shot_data
@@ -157,7 +191,9 @@ def render_dashboard(root: Path) -> None:
     # ==== Tab 1: Shot Map (Plotly, fixed size) ====
     with tabs[0]:
         shots_csv = root / "data" / "processed_shots.csv"
-        df_shots = _load_shots_df(root, _file_mtime(shots_csv))
+        df_shots, shot_issues = _load_shots_df(root, _file_mtime(shots_csv))
+        for issue in shot_issues:
+            st.warning(issue)
         if df_shots.empty:
             st.info("No shots available yet. Please run the pipeline.")
         else:
@@ -208,6 +244,9 @@ def render_dashboard(root: Path) -> None:
             if dff.empty:
                 st.warning("No shots match the selected filters.")
             else:
+                msg = sample_size_warning(dff, threshold=8)
+                if msg:
+                    st.info(msg)
                 # Fixed figure size that fits Streamlit layout on load
                 fig = make_shot_map_plotly(
                     dff,
@@ -244,10 +283,13 @@ def render_dashboard(root: Path) -> None:
     # ==== Tab 2: Passing Network (Plotly, fixed size) ====
     with tabs[1]:
         passes_path = root / "data" / "passing_data.csv"
-        df_pass = load_passes_csv(passes_path)
-        if df_pass is None or df_pass.empty:
+        result = load_passes_csv(passes_path)
+        if result is None or result.frame.empty:
             st.info("No passing data yet. Please run the pipeline.")
         else:
+            for issue in result.issues:
+                st.warning(issue)
+            df_pass = result.frame.copy()
             c1, c2, c3 = st.columns(3)
             min_passes = int(
                 c1.slider(
@@ -284,6 +326,9 @@ def render_dashboard(root: Path) -> None:
             if dfp.empty:
                 st.warning("No passes match the selected filters.")
             else:
+                msg = sample_size_warning(dfp, threshold=12)
+                if msg:
+                    st.info(msg)
                 nodes, edges_tbl = build_network_tables(
                     dfp, min_passes=min_passes
                 )
@@ -331,7 +376,9 @@ def render_dashboard(root: Path) -> None:
 
     # ==== Tab 4: Data ====
     with tabs[3]:
-        df_shots = _load_shots_df(root)
+        df_shots, issues = _load_shots_df(root)
+        for issue in issues:
+            st.warning(issue)
         if df_shots.empty:
             st.info("No processed_shots.csv yet.")
         else:

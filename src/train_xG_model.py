@@ -1,4 +1,5 @@
-# train_xG_model.py
+# src/train_xG_model.py
+
 from pathlib import Path
 import joblib
 import numpy as np

@@ -1,9 +1,11 @@
 # main.py
+from __future__ import annotations
+
 import os
 import subprocess
+import sys
 
 
-# Add an extra blank line to follow PEP 8
 def run_pipeline() -> None:
     """Orchestrate the full data pipeline: fetch, process, train."""
     print("Starting Football Analytics Pipeline…")
@@ -11,7 +13,7 @@ def run_pipeline() -> None:
     scripts = [
         "fetch_statsbomb.py",
         "fetch_shots_data.py",
-        "fetch_passing_data.py",   # now exists
+        "fetch_passing_data.py",
         "preprocess_xG.py",
         "train_xG_model.py",
     ]
@@ -20,7 +22,7 @@ def run_pipeline() -> None:
     for script in scripts:
         script_path = os.path.join(base_dir, script)
         print(f"▶ Running {script}…")
-        result = subprocess.run(["python", script_path])
+        result = subprocess.run([sys.executable, script_path], check=False)
         if result.returncode != 0:
             print(f"Error while running {script}. Check logs.")
             return

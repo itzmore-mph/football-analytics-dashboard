@@ -9,8 +9,9 @@ def main() -> None:
     """Streamlit entry point."""
     st.set_page_config(
         page_title="Football Analytics Dashboard",
-        layout="centered"
-        )
+        layout="wide",
+        initial_sidebar_state="expanded",
+    )
     # repo root: .../src/dashboard/app.py -> parents[2]
     root = Path(__file__).resolve().parents[2]
     render_dashboard(root)

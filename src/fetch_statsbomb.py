@@ -1,27 +1,50 @@
 # src/fetch_statsbomb.py
+from __future__ import annotations
+
 from pathlib import Path
 import json
-import requests
+from typing import Final
 
-ROOT = Path(__file__).resolve().parents[1]
-DATA = ROOT / "data"
+import requests
+from requests import RequestException
+
+
+class StatsBombFetchError(RuntimeError):
+    """Raised when StatsBomb open-data files cannot be downloaded."""
+
+
+ROOT: Final[Path] = Path(__file__).resolve().parents[1]
+DATA: Final[Path] = ROOT / "data"
 DATA.mkdir(parents=True, exist_ok=True)
 
-RAW_BASE = "https://raw.githubusercontent.com/statsbomb/open-data/master/data"
+RAW_BASE: Final[str] = (
+    "https://raw.githubusercontent.com/statsbomb/open-data/master/data"
+)
 
 
 def _download(url: str, out: Path) -> Path:
     out.parent.mkdir(parents=True, exist_ok=True)
-    r = requests.get(
-        url,
-        timeout=30,
-        headers={"User-Agent": "football-analytics-dashboard"}
-    )
-    if r.status_code != 200:
-        raise RuntimeError(f"HTTP {r.status_code} für {url}")
+    try:
+        r = requests.get(
+            url,
+            timeout=30,
+            headers={"User-Agent": "football-analytics-dashboard"},
+        )
+        r.raise_for_status()
+    except RequestException as exc:  # pragma: no cover - network failures vary
+        raise StatsBombFetchError(
+            f"Could not download StatsBomb open data: {url} ({exc})"
+        ) from exc
+
     out.write_bytes(r.content)
-    # Validieren
-    json.loads(out.read_text(encoding="utf-8"))
+    # Validate JSON to catch HTML error pages early
+    try:
+        json.loads(out.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        out.unlink(missing_ok=True)
+        raise StatsBombFetchError(
+            f"Downloaded file is not valid JSON: {url}"
+        ) from exc
     return out
 
 

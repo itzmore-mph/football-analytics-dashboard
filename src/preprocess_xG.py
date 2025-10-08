@@ -1,7 +1,11 @@
+# src/preprocess_xG.py
+
 # Preprocess raw shot data for xG modeling
 
 from pathlib import Path
 import pandas as pd
+
+from .validation import validate_shots
 
 ROOT = Path(__file__).resolve().parents[1]
 DATA = ROOT / "data"
@@ -13,26 +17,32 @@ def main():
     if not IN_CSV.exists():
         print(f"Error: {IN_CSV} not found. Run fetch_shots_data.py first.")
         return
-    df = pd.read_csv(IN_CSV)
+    raw = pd.read_csv(IN_CSV)
+    validated = validate_shots(raw)
+    for issue in validated.issues:
+        print(f"Warning: {issue}")
+    df = validated.frame
 
-    # Minimal cleaning / schema guarantee
-    required = [
-        "shot_distance", "shot_angle", "goal_scored",
-        "x", "y", "team", "player"
+    keep_cols = [
+        "shot_distance",
+        "shot_angle",
+        "goal_scored",
+        "x",
+        "y",
+        "team",
+        "player",
+        "xG",
+        "minute",
+        "second",
+        "under_pressure",
+        "is_penalty",
+        "is_header",
+        "body_part",
+        "technique",
+        "shot_type",
     ]
-    missing = [c for c in required if c not in df.columns]
-    if missing:
-        print(f"Warning: missing columns {missing} in {IN_CSV}")
-
-    # Ensure dtypes
-    for c in ["shot_distance", "shot_angle", "x", "y"]:
-        if c in df.columns:
-            df[c] = pd.to_numeric(df[c], errors="coerce")
-    if "goal_scored" in df.columns:
-        df["goal_scored"] = df["goal_scored"].astype(int)
-
-    # Optional: drop clear invalids
-    df = df.dropna(subset=["shot_distance", "shot_angle", "goal_scored"])
+    existing = [c for c in keep_cols if c in df.columns]
+    df = df[existing].copy()
 
     df.to_csv(OUT_CSV, index=False)
     print(f"Wrote processed shots: {OUT_CSV}")

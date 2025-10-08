@@ -1,15 +1,24 @@
+# src/passing_network.py
+
 # Passing Network Visualization
 
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Final
 
 import pandas as pd
 import networkx as nx
-from mplsoccer import Pitch
 
-ROOT = Path(__file__).resolve().parents[1]
-DATA_PATH = ROOT / "data" / "passing_data.csv"
+try:  # mplsoccer is optional for non-plot use-cases/tests
+    from mplsoccer import Pitch
+except ImportError:  # pragma: no cover - exercised when dependency missing
+    Pitch = None  # type: ignore[assignment]
+
+from .validation import ValidationResult, validate_passes
+
+ROOT: Final[Path] = Path(__file__).resolve().parents[1]
+DATA_PATH: Final[Path] = ROOT / "data" / "passing_data.csv"
 
 
 def _candidate_paths(path: Path) -> list[Path]:
@@ -20,14 +29,7 @@ def _candidate_paths(path: Path) -> list[Path]:
     return candidates
 
 
-def _coerce_numeric(df: pd.DataFrame, cols: list[str]) -> pd.DataFrame:
-    for c in cols:
-        if c in df.columns:
-            df[c] = pd.to_numeric(df[c], errors="coerce")
-    return df
-
-
-def load_data(path: Path = DATA_PATH) -> pd.DataFrame | None:
+def load_data(path: Path = DATA_PATH) -> ValidationResult | None:
     """
     Load passing CSV and return a clean DataFrame with at least:
     ['passer','receiver','x','y']
@@ -59,31 +61,18 @@ def load_data(path: Path = DATA_PATH) -> pd.DataFrame | None:
             if col in df.columns:
                 df[col] = df[col].astype(str).str.strip()
 
-        # Coerce numerics
-        num_cols = [
-            "x",
-            "y",
-            "start_x",
-            "start_y",
-            "end_x",
-            "end_y",
-            "minute",
-            "second"
-        ]
-        df = _coerce_numeric(df, num_cols)
-
-        # Drop obvious invalids and limit to pitch
-        df = df.dropna(subset=["passer", "receiver", "x", "y"]).copy()
-        df = df.query("0 <= x <= 120 and 0 <= y <= 80").copy()
+        validated = validate_passes(df)
 
         # If end_x/y missing, synthesize from x/y so downstream code works
-        if "end_x" not in df.columns:
-            df["end_x"] = df["x"]
-        if "end_y" not in df.columns:
-            df["end_y"] = df["y"]
+        if "end_x" not in validated.frame.columns:
+            validated.frame["end_x"] = validated.frame["x"]
+        if "end_y" not in validated.frame.columns:
+            validated.frame["end_y"] = validated.frame["y"]
 
         print(f"Loaded passing data from {candidate}")
-        return df
+        for issue in validated.issues:
+            print(f"Warning: {issue}")
+        return validated
 
     print(f"Error: Data file {path} not found.")
     return None
@@ -214,6 +203,11 @@ def plot_passing_network(
     """
     Render the network on a StatsBomb pitch. Returns a matplotlib Figure.
     """
+    if Pitch is None:
+        raise RuntimeError(
+            "mplsoccer is required for plotting. Install mplsoccer or "
+            "use make_passing_network_plotly for a pure Plotly version."
+        )
     pitch = Pitch(pitch_type="statsbomb", line_color="black")
     fig, ax = pitch.draw(figsize=figsize)
     pos = nx.get_node_attributes(G, "pos")
@@ -262,11 +256,12 @@ def plot_passing_network(
 
 
 def main():
-    df = load_data()
-    if df is None or df.empty:
+    result = load_data()
+    if result is None or result.frame.empty:
         print("Passing network not available.")
         return
 
+    df = result.frame
     G = create_passing_network(df, same_team_only=True, min_passes=2)
     fig = plot_passing_network(G, title="Passing Network (min 2 passes)")
     out_path = DATA_PATH.with_suffix(".png")

@@ -12,27 +12,33 @@
 
 ```plaintext
 football-analytics-dashboard/
-│── data/                 # Raw & processed datasets
-│   │── 15946.json        # Raw match event data
-│   │── shots_data.csv    # Extracted shot data
-│   │── processed_shots.csv # Cleaned data for xG model
-│
-│── models/               # Trained ML models
-│   │── xgboost_xg_model.pkl  # Trained xG model
-│
-│── src/                  # Source code for the project
-│   │── fetch_statsbomb.py   # Fetch match data from StatsBomb
-│   │── fetch_shots_data.py  # Extract shot data from raw JSON
-│   │── preprocess_xG.py     # Clean and process shot data
-│   │── train_xG_model.py    # Train xG model using XGBoost
-│   │── passing_network.py   # Analyze passing networks
-│   │── dashboard.py         # Streamlit dashboard
-│   │── ui.py                # UI Optimization
-│
-│── README.md             # Project documentation (this file)
-│── .gitignore            # Ignore unnecessary files (e.g., .csv, .pkl)
-│── requirements.txt     # Python dependencies
-│── dashboard.gif         # Dashboard Preview
+├── data/                         # Raw & processed datasets (not tracked in git)
+├── models/                       # Trained ML models
+├── src/
+│   ├── dashboard/                # Streamlit page assembly & charts
+│   │   ├── __init__.py
+│   │   ├── app.py
+│   │   ├── data.py
+│   │   └── plots.py
+│   ├── fetch_passing_data.py     # Extract passing data from raw JSON
+│   ├── fetch_shots_data.py       # Extract shot data from raw JSON
+│   ├── fetch_statsbomb.py        # Fetch match data from StatsBomb
+│   ├── open_data.py              # Helpers for working with StatsBomb open data
+│   ├── passing_network.py        # Network analysis helpers
+│   ├── preprocess_xG.py          # Clean and process shot data
+│   ├── train_xG_model.py         # Train xG model using XGBoost
+│   ├── ui.py                     # Streamlit entry point
+│   └── validation.py             # Data validation utilities
+├── tests/                        # Pytest suite for validation & plotting
+│   ├── conftest.py
+│   ├── test_plots.py
+│   ├── test_ui_helpers.py
+│   └── test_validation.py
+├── streamlit_app.py              # Streamlit launcher (imports src.ui)
+├── main.py                       # CLI wrapper for pipeline tasks
+├── requirements.txt              # Python dependencies
+├── setup.py                      # Editable install metadata
+└── README.md                     # Project documentation (this file)
 ```
 
 ---
@@ -58,6 +64,9 @@ source venv/bin/activate  # On Windows use: venv\Scripts\activate
 ```bash
 pip install -r requirements.txt
 ```
+
+ℹ️ `mplsoccer` and `matplotlib` are required for the Matplotlib-based passing network export.
+The Streamlit app works with the core dependencies alone.
 
 ---
 
@@ -87,6 +96,22 @@ python src/train_xG_model.py
 ```bash
 streamlit run streamlit_app.py
 ```
+
+### 5️⃣ Run the Test Suite
+
+```bash
+pytest
+```
+
+### Troubleshooting
+
+- **StatsBomb downloads fail behind a proxy**
+– set `HTTP_PROXY`/`HTTPS_PROXY` environment variables before launching Streamlit or the pipeline.
+- **No data displayed**
+– click **Update Dashboard** to execute the local pipeline. Validation warnings for malformed rows are shown inline.
+- **Optional plotting libs missing**
+– install extra dependencies with `pip install -r requirements.txt`
+(they are already listed under "Visualization / optional extras").
 
 ---
 

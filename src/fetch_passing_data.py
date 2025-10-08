@@ -1,3 +1,5 @@
+# src/fetch_passing_data.py
+
 from pathlib import Path
 import json
 import csv
@@ -46,6 +48,8 @@ def main(match_id: int = 15946):
 
         team_passer = _get(e, "team", "name")
         team_receiver = _get(e, "pass", "recipient", "team", "name")
+        if not team_receiver:
+            team_receiver = team_passer
 
         rows.append({
             "match_id": match_id,
