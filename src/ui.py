@@ -5,7 +5,6 @@ import os
 import subprocess
 import sys
 from pathlib import Path
-from typing import Tuple
 
 import pandas as pd
 import streamlit as st
@@ -17,8 +16,8 @@ from .passing_network import (
     plot_passing_network,
 )
 
-
 # ---------- helpers ----------
+
 
 def _run_py(script: Path) -> None:
     """Run a Python script and show stdout/stderr in Streamlit."""
@@ -54,10 +53,12 @@ def _match_label(row: pd.Series) -> str:
 def _read_json(path: Path) -> pd.DataFrame:
     if not path.exists():
         return pd.DataFrame()
-    return pd.read_json(path)
+    try:
+        return pd.read_json(path)
+    except ValueError:
+        return pd.DataFrame()
 
 
-# add helper
 def _file_mtime(p: Path) -> float:
     try:
         return p.stat().st_mtime
@@ -66,24 +67,34 @@ def _file_mtime(p: Path) -> float:
 
 
 @st.cache_data
-def _load_shots_df(path: Path, mtime: float) -> pd.DataFrame:
-    if not path.exists():
+def _load_shots_df(root: Path, mtime: float | None = None) -> pd.DataFrame:
+    """
+    Cached loader for processed_shots.csv.
+    If mtime is None we compute it, so old call sites still work.
+    """
+    csv_path = root / "data" / "processed_shots.csv"
+    if mtime is None:
+        mtime = _file_mtime(csv_path)  # used only to key the cache
+    _ = mtime
+
+    if not csv_path.exists():
         return pd.DataFrame()
-    df = pd.read_csv(path)
+    df = pd.read_csv(csv_path)
     needed = {"x", "y", "goal_scored"}
     if not needed.issubset(df.columns):
         return pd.DataFrame()
     return df
 
 
-def _minute_range(df: pd.DataFrame) -> Tuple[int, int]:
+def _minute_range(df: pd.DataFrame) -> tuple[int, int]:
     if "minute" in df.columns and df["minute"].notna().any():
-        max_minute = int(min(120, df["minute"].max()))
-        return 0, max(45, min(105, max_minute))
+        mx = int(min(120, df["minute"].max()))
+        return 0, max(45, min(105, mx))
     return 0, 105
 
 
 # ---------- main UI ----------
+
 
 def render_dashboard(root: Path) -> None:
     st.title("Football Analytics Dashboard")
@@ -93,12 +104,14 @@ def render_dashboard(root: Path) -> None:
         fetch_competitions()
         comps = _read_json(root / "data" / "competitions.json")
         if comps.empty:
-            st.warning("Konnte competitions.json nicht laden.")
+            st.warning("Could not load competitions.json.")
             return
 
         comps = comps.sort_values(["competition_name", "season_name"])
         comp_labels = comps.apply(_comp_label, axis=1).tolist()
-        comp_choice = st.selectbox("Competition / Season", comp_labels)
+        comp_choice = st.selectbox(
+            "Competition / Season", comp_labels, key="picker_comp_season"
+        )
         sel = comps.iloc[comp_labels.index(comp_choice)]
         comp_id = int(sel.competition_id)
         season_id = int(sel.season_id)
@@ -106,13 +119,16 @@ def render_dashboard(root: Path) -> None:
         # 2) Matches
         fetch_matches(comp_id, season_id)
         matches = _read_json(
-            root / "data" / "matches" / str(comp_id) / f"{season_id}.json")
+            root / "data" / "matches" / str(comp_id) / f"{season_id}.json"
+        )
         if matches.empty:
-            st.warning("Konnte Matches nicht laden.")
+            st.warning("Could not load matches.")
             return
 
         matches["label"] = matches.apply(_match_label, axis=1)
-        match_choice = st.selectbox("Match", matches["label"].tolist())
+        match_choice = st.selectbox(
+            "Match", matches["label"].tolist(), key="picker_match"
+        )
         match_id = int(match_choice.split("id=")[-1].rstrip(")"))
 
         # 3) Trigger pipeline
@@ -139,41 +155,133 @@ def render_dashboard(root: Path) -> None:
 
     # Tab 1: Shot Map
     with tabs[0]:
-        shots_path = root / "data" / "processed_shots.csv"
-        df_shots = _load_shots_df(shots_path, _file_mtime(shots_path))
+        shots_csv = root / "data" / "processed_shots.csv"
+        df_shots = _load_shots_df(root, _file_mtime(shots_csv))
         if df_shots.empty:
             st.info("No shots available yet. Please run the pipeline.")
         else:
-            try:
-                from mplsoccer import Pitch  # heavy import; inside try
+            team_options = ["All teams"] + sorted(
+                df_shots.get("team", pd.Series(dtype=str))
+                .dropna()
+                .unique()
+                .tolist()
+            )
+            outcome_options = ["All shots", "Goals", "Other shots"]
 
-                pitch = Pitch(pitch_type="statsbomb", line_color="black")
-                fig, ax = pitch.draw(figsize=(10, 6))
-                size = (df_shots.get("xG", pd.Series([0]*len(df_shots)))
-                        .clip(0, 0.8) * 500) + 18
-                ax.scatter(df_shots["x"], df_shots["y"], s=size, alpha=0.65)
-                ax.set_title("Shot Map (Bubble size = xG)")
-                st.pyplot(fig, clear_figure=True)
-            except Exception as exc:  # pragma: no cover
-                st.error(f"Plot-Fehler (Shot Map): {exc}")
+            # Size slider
+            size_col, _, _ = st.columns([2, 1, 1])
+            sm_scale = size_col.slider(
+                "Pitch size",
+                0.5,
+                1.2,
+                0.8,
+                0.05,
+                key=f"sm_scale_{match_id}",
+                help="Scales the representation of the Shot Map.",
+            )
+            w_sm, h_sm = 8 * sm_scale, 4.5 * sm_scale
+
+            c1, c2, c3 = st.columns(3)
+            team_choice = c1.selectbox(
+                "Team", team_options, key=f"sm_team_{match_id}"
+            )
+            outcome_choice = c2.selectbox(
+                "Outcome",
+                outcome_options,
+                index=0,
+                key=f"sm_outcome_{match_id}",
+            )
+            mn_from, mn_to = _minute_range(df_shots)
+            minute_range = c3.slider(
+                "Minute range",
+                mn_from,
+                mn_to,
+                (mn_from, mn_to),
+                key=f"sm_minute_{match_id}",
+            )
+
+            dff = df_shots.copy()
+            if team_choice != "All teams" and "team" in dff.columns:
+                dff = dff[dff["team"] == team_choice]
+            if outcome_choice == "Goals" and "goal_scored" in dff.columns:
+                dff = dff[dff["goal_scored"] == 1]
+            elif (
+                outcome_choice == "Other shots"
+                and "goal_scored" in dff.columns
+            ):
+                dff = dff[dff["goal_scored"] == 0]
+            if "minute" in dff.columns:
+                dff = dff[
+                    (dff["minute"].fillna(0) >= minute_range[0])
+                    & (dff["minute"].fillna(mn_to) <= minute_range[1])
+                ]
+
+            if dff.empty:
+                st.warning("No shots for the selected filters.")
+            else:
+                try:
+                    from mplsoccer import Pitch  # heavy import
+
+                    pitch = Pitch(pitch_type="statsbomb", line_color="black")
+                    fig, ax = pitch.draw(figsize=(w_sm, h_sm))
+                    xg = dff.get(
+                        "xG", pd.Series([0.0] * len(dff), index=dff.index)
+                    )
+                    size = (xg.clip(0, 0.8) * 420) + 14
+                    ax.scatter(dff["x"], dff["y"], s=size, alpha=0.7)
+                    ax.set_title("Shot Map (bubble size = xG)")
+                    st.pyplot(
+                        fig,
+                        clear_figure=True,
+                        use_container_width=False,
+                    )
+                except Exception as exc:  # pragma: no cover
+                    st.error(f"Plot error (Shot Map): {exc}")
 
     # Tab 2: Passing Network
     with tabs[1]:
-        df_pass = load_passes_csv()
+        df_pass = load_passes_csv(root / "data" / "passing_data.csv")
         if df_pass is None or df_pass.empty:
-            st.info("Noch keine Passing-Daten. Bitte Pipeline ausführen.")
+            st.info("No passing data yet. Please run the pipeline.")
         else:
+            # Size slider
+            size_col, _, _ = st.columns([2, 1, 1])
+            pn_scale = size_col.slider(
+                "Network size",
+                0.5,
+                1.2,
+                0.8,
+                0.05,
+                key=f"pn_scale_{match_id}",
+                help="Scales the representation of the Passing Network.",
+            )
+            w_pn, h_pn = 8 * pn_scale, 4.5 * pn_scale
+
             c1, c2, c3 = st.columns(3)
             min_passes = int(
-                c1.slider("Min passes zwischen Spielern", 1, 8, 2)
+                c1.slider(
+                    "Min passes between players",
+                    1,
+                    8,
+                    2,
+                    key=f"pn_min_passes_{match_id}",
                 )
+            )
             half = c2.selectbox(
-                "Half", ["Both", "1st half", "2nd half"], index=0
-                )
+                "Half",
+                ["Both", "1st half", "2nd half"],
+                index=0,
+                key=f"pn_half_{match_id}",
+            )
             mn_from, mn_to = _minute_range(df_pass)
             m1, m2 = c3.slider(
-                "Minute range", mn_from, mn_to, (mn_from, mn_to)
-                )
+                "Minute range",
+                mn_from,
+                mn_to,
+                (mn_from, mn_to),
+                key=f"pn_minute_{match_id}",
+            )
+
             dfp = df_pass.copy()
             if "minute" in dfp.columns:
                 if half == "1st half":
@@ -181,13 +289,18 @@ def render_dashboard(root: Path) -> None:
                 elif half == "2nd half":
                     dfp = dfp.query("minute > 45")
                 dfp = dfp[(dfp["minute"] >= m1) & (dfp["minute"] <= m2)]
+
             G = create_passing_network(
-                dfp, same_team_only=True, min_passes=min_passes
-                )
+                dfp,
+                same_team_only=True,
+                min_passes=min_passes,
+            )
             fig = plot_passing_network(
-                G, title=f"Passing Network (≥{min_passes} passes)"
-                )
-            st.pyplot(fig, clear_figure=True)
+                G,
+                title=f"Passing Network (≥{min_passes} passes)",
+                figsize=(w_pn, h_pn),
+            )
+            st.pyplot(fig, clear_figure=True, use_container_width=False)
 
     # Tab 3: Model
     with tabs[2]:
@@ -214,6 +327,6 @@ def render_dashboard(root: Path) -> None:
     with tabs[3]:
         df_shots = _load_shots_df(root)
         if df_shots.empty:
-            st.info("Noch keine processed_shots.csv.")
+            st.info("No processed_shots.csv yet.")
         else:
             st.dataframe(df_shots.head(500))
