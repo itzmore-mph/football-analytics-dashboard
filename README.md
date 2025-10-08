@@ -8,12 +8,6 @@
 - Interactive Streamlit dashboard for match-day analytics  
 - Data fetching & preprocessing pipeline  
 
-## Demo
-
-![Dashboard GIF](./dashboard.gif)
-
----
-
 ## Project Structure
 
 ```plaintext

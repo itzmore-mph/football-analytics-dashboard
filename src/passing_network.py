@@ -143,12 +143,18 @@ def create_passing_network(
     """
     Build a directed graph of passes.
     """
-    team_p_col = "team_passer" if "team_passer" in df.columns else ("team" if "team" in df.columns else None)
-    team_r_col = "team_receiver" if "team_receiver" in df.columns else ("team" if "team" in df.columns else None)
+    team_p_col = (
+        "team_passer" if "team_passer" in df.columns
+        else ("team" if "team" in df.columns else None)
+    )
+    team_r_col = (
+        "team_receiver" if "team_receiver" in df.columns
+        else ("team" if "team" in df.columns else None)
+    )
 
     df_use = df.copy()
     if same_team_only and team_p_col and team_r_col:
-        # Only teammate-to-teammate passes (should be all SB passes, but guard anyway)
+        # Only teammate-to-teammate passes
         df_use = df_use[df_use[team_p_col] == df_use[team_r_col]].copy()
 
     # Edge table
@@ -158,7 +164,9 @@ def create_passing_network(
         .reset_index(name="weight")
     )
     # Remove self-passes and NaN receivers
-    edges = edges[(edges["passer"] != edges["receiver"]) & edges["receiver"].notna()]
+    edges = edges[
+        (edges["passer"] != edges["receiver"]) & edges["receiver"].notna()
+    ]
 
     if min_passes > 1:
         edges = edges[edges["weight"] >= min_passes]
@@ -181,7 +189,9 @@ def create_passing_network(
     return G
 
 
-def _scaled_widths(G: nx.DiGraph, base: float = 0.6, scale: float = 1.6) -> list[float]:
+def _scaled_widths(
+    G: nx.DiGraph, base: float = 0.6, scale: float = 1.6
+) -> list[float]:
     """Scale edge widths relative to min/max weights for readability."""
     weights = [float(d.get("weight", 1.0)) for _, _, d in G.edges(data=True)]
     if not weights:
@@ -196,7 +206,8 @@ def plot_passing_network(
     G: nx.DiGraph,
     *,
     title: str = "Passing Network",
-    edge_scale: float = 0.25,  # kept for API compatibility (unused in new width scaling)
+    edge_scale: float = 0.25,  # kept for API compatibility
+    # (unused in new width scaling)
     node_scale: float = 2200.0,
     figsize: tuple[float, float] = (7, 4.5),
 ):
@@ -213,9 +224,25 @@ def plot_passing_network(
         if G.number_of_edges() > 0
         else {n: 0.0 for n in G.nodes()}
     )
-    node_sizes = [max(centrality.get(n, 0.0), 0.01) * node_scale for n in G.nodes()]
-    nx.draw_networkx_nodes(G, pos, ax=ax, node_size=node_sizes, alpha=0.85)
-    nx.draw_networkx_labels(G, pos, ax=ax, font_size=8, font_color="white", font_weight="bold")
+    node_sizes = [
+        max(centrality.get(n, 0.0), 0.01) * node_scale
+        for n in G.nodes()
+    ]
+    nx.draw_networkx_nodes(
+        G,
+        pos,
+        ax=ax,
+        node_size=node_sizes,
+        alpha=0.85
+        )
+    nx.draw_networkx_labels(
+        G,
+        pos,
+        ax=ax,
+        font_size=8,
+        font_color="white",
+        font_weight="bold"
+        )
 
     # Edge widths scaled relative to min/max for readability
     widths = _scaled_widths(G, base=0.6, scale=1.8)

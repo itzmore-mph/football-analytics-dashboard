@@ -2,6 +2,7 @@
 pandas>=2.2,<3
 numpy>=1.26,<3
 plotly>=5.18,<6
+setuptools>=68.0,<69
 
 # Graphs / Network
 networkx>=3.2,<4

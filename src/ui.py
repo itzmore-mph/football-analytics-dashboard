@@ -10,12 +10,12 @@ import pandas as pd
 import streamlit as st
 
 from .fetch_statsbomb import fetch_competitions, fetch_matches, fetch_events
-from .plots import (
+from .dashboard import (
     make_shot_map_plotly,
     make_passing_network_plotly,
     build_network_tables,
 )
-from .passing_network import load_data as load_passes_csv  # reuse robust CSV loader
+from .passing_network import load_data as load_passes_csv
 
 # ---------- helpers ----------
 
@@ -214,8 +214,11 @@ def render_dashboard(root: Path) -> None:
                     title="Shot Map (bubble = xG, red = goal)",
                     fig_size=(880, 480),  # ~fits most laptop widths
                 )
-                st.plotly_chart(fig, use_container_width=False, theme="streamlit")
-
+                st.plotly_chart(
+                    fig,
+                    use_container_width=False,
+                    theme="streamlit"
+                )
                 # Optional: quick table for top shooters by xG
                 if {"player", "xG"}.issubset(dff.columns):
                     st.subheader("Top shooters by xG")

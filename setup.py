@@ -3,7 +3,10 @@ from setuptools import setup, find_packages
 setup(
     name="football_analytics_dashboard",
     version="0.1.0",
-    description="A Streamlit-based football analytics dashboard and data pipeline",
+    description=(
+        "A Streamlit-based football analytics dashboard and "
+        "data pipeline"
+    ),
     author="Moritz Philipp Haaf",
     packages=find_packages(where="src"),
     package_dir={"": "src"},
