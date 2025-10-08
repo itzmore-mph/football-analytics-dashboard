@@ -105,7 +105,8 @@ def render_dashboard(root: Path) -> None:
 
         # 2) Matches
         fetch_matches(comp_id, season_id)
-        matches = _read_json(root / "data" / "matches" / str(comp_id) / f"{season_id}.json")
+        matches = _read_json(
+            root / "data" / "matches" / str(comp_id) / f"{season_id}.json")
         if matches.empty:
             st.warning("Konnte Matches nicht laden.")
             return
@@ -148,7 +149,8 @@ def render_dashboard(root: Path) -> None:
 
                 pitch = Pitch(pitch_type="statsbomb", line_color="black")
                 fig, ax = pitch.draw(figsize=(10, 6))
-                size = (df_shots.get("xG", pd.Series([0]*len(df_shots))).clip(0, 0.8) * 500) + 18
+                size = (df_shots.get("xG", pd.Series([0]*len(df_shots)))
+                        .clip(0, 0.8) * 500) + 18
                 ax.scatter(df_shots["x"], df_shots["y"], s=size, alpha=0.65)
                 ax.set_title("Shot Map (Bubble size = xG)")
                 st.pyplot(fig, clear_figure=True)
@@ -162,10 +164,16 @@ def render_dashboard(root: Path) -> None:
             st.info("Noch keine Passing-Daten. Bitte Pipeline ausführen.")
         else:
             c1, c2, c3 = st.columns(3)
-            min_passes = int(c1.slider("Min passes zwischen Spielern", 1, 8, 2))
-            half = c2.selectbox("Half", ["Both", "1st half", "2nd half"], index=0)
+            min_passes = int(
+                c1.slider("Min passes zwischen Spielern", 1, 8, 2)
+                )
+            half = c2.selectbox(
+                "Half", ["Both", "1st half", "2nd half"], index=0
+                )
             mn_from, mn_to = _minute_range(df_pass)
-            m1, m2 = c3.slider("Minute range", mn_from, mn_to, (mn_from, mn_to))
+            m1, m2 = c3.slider(
+                "Minute range", mn_from, mn_to, (mn_from, mn_to)
+                )
             dfp = df_pass.copy()
             if "minute" in dfp.columns:
                 if half == "1st half":
@@ -173,8 +181,12 @@ def render_dashboard(root: Path) -> None:
                 elif half == "2nd half":
                     dfp = dfp.query("minute > 45")
                 dfp = dfp[(dfp["minute"] >= m1) & (dfp["minute"] <= m2)]
-            G = create_passing_network(dfp, same_team_only=True, min_passes=min_passes)
-            fig = plot_passing_network(G, title=f"Passing Network (≥{min_passes} passes)")
+            G = create_passing_network(
+                dfp, same_team_only=True, min_passes=min_passes
+                )
+            fig = plot_passing_network(
+                G, title=f"Passing Network (≥{min_passes} passes)"
+                )
             st.pyplot(fig, clear_figure=True)
 
     # Tab 3: Model
