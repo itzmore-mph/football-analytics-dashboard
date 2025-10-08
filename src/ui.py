@@ -220,8 +220,21 @@ def render_dashboard(root: Path) -> None:
             st.success("Pipeline updated.")
             # Avoid clearing all app caches
             st.session_state["last_pipeline_mtime"] = time.time()
-            # Force a rerun so UI reflects new data
-            st.experimental_rerun()
+            # Force a rerun so UI reflects new data (fallback)
+            try:
+                if hasattr(st, "experimental_rerun"):
+                    st.experimental_rerun()
+                elif hasattr(st, "rerun"):
+                    st.rerun()
+                else:
+                    # If no rerun API found, stop this run so user can refresh
+                    st.stop()
+                    st.info(
+                        "Dashboard updated; please refresh the page."
+                    )
+            except Exception:
+                st.stop()
+                st.info("Dashboard updated; please refresh the page.")
 
     # --------- TABS ---------
     tabs = st.tabs(["Shot Map (xG)", "Passing Network", "Model", "Data"])

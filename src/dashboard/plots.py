@@ -226,15 +226,27 @@ def make_passing_network_plotly(
 
     # Edges first
     if not edges.empty:
+        # Build interleaved coordinate arrays [x0, x1, nan, x0, x1, nan, ...]
+        n = len(edges)
+        xs = np.empty(n * 3, dtype=float)
+        ys = np.empty(n * 3, dtype=float)
+        # fill arrays
+        xs[0::3] = edges["x0"].to_numpy(dtype=float)
+        xs[1::3] = edges["x1"].to_numpy(dtype=float)
+        xs[2::3] = np.nan
+        ys[0::3] = edges["y0"].to_numpy(dtype=float)
+        ys[1::3] = edges["y1"].to_numpy(dtype=float)
+        ys[2::3] = np.nan
+
         fig.add_trace(
             go.Scatter(
-                x=np.r_[edges["x0"], edges["x1"],
-                        [None]].reshape(-1, 3).ravel(),
-                y=np.r_[edges["y0"], edges["y1"],
-                        [None]].reshape(-1, 3).ravel(),
+                x=xs,
+                y=ys,
                 mode="lines",
-                line=dict(width=edges["w"].clip(lower=0.6, upper=6).tolist(),
-                            color="black"),
+                line=dict(
+                    width=edges["w"].clip(lower=0.6, upper=6).tolist(),
+                    color="black"
+                    ),
                 hovertext=edges["label"],
                 hoverinfo="text",
                 opacity=0.65,

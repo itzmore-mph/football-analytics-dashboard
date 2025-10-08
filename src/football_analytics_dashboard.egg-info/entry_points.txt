@@ -1,0 +1,3 @@
+[console_scripts]
+football-dashboard = dashboard.app:main
+football-pipeline = main:run_pipeline
