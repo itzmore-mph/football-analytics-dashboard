@@ -13,7 +13,7 @@ from sklearn.pipeline import Pipeline as SkPipeline
 from sklearn.calibration import CalibratedClassifierCV
 import xgboost as xgb
 
-# ---------- Pfade ----------
+# ---------- Paths ----------
 ROOT = Path(__file__).resolve().parents[1]
 DATA_PATH = ROOT / "data" / "processed_shots.csv"
 MODEL_DIR = ROOT / "models"
@@ -25,11 +25,11 @@ FEATURES_PATH = MODEL_DIR / "features.txt"
 CALIB_PNG = MODEL_DIR / "xg_calibration.png"
 XG_BUCKETS_CSV = MODEL_DIR / "xg_buckets.csv"
 
-# ---------- Daten laden ----------
+# ---------- Load ----------
 df = pd.read_csv(DATA_PATH).copy()
 df = df.dropna(subset=["shot_distance", "shot_angle", "goal_scored"])
 
-# Flags/Zeiten säubern
+# Flags / time hygiene
 for col in ["under_pressure", "is_penalty", "is_header"]:
     if col in df.columns:
         df[col] = df[col].fillna(0).astype(int)
@@ -49,13 +49,11 @@ numeric_features = [
     "angle_squared",
     "distance_angle_interaction",
 ]
-
 categorical_features = []
 if "body_part" in df.columns:
     categorical_features.append("body_part")
 if "technique" in df.columns:
     categorical_features.append("technique")
-
 extra_numeric = []
 for col in ["under_pressure", "is_penalty", "is_header", "minute", "second"]:
     if col in df.columns:
@@ -72,38 +70,45 @@ X_train, X_test, y_train, y_test = train_test_split(
     X, y, test_size=0.20, random_state=42, stratify=y
 )
 
-# ---------- Preprocessing (robust für sklearn-Versionen) ----------
+# ---------- sklearn version guards ----------
 major, minor = map(int, sklearn.__version__.split(".")[:2])
-use_sparse_output = (major, minor) >= (1, 2)
-use_estimator_kw = (major, minor) >= (1, 4)  # CalibratedClassifierCV(estimator=...) ab 1.4
+use_sparse_output = (major, minor) >= (1, 2)       # OneHotEncoder change
+use_estimator_kw = (major, minor) >= (1, 4)        # CalibratedClassifierCV change
 
 numeric_transformer = MinMaxScaler()
 if categorical_features:
     if use_sparse_output:
-        categorical_transformer = OneHotEncoder(handle_unknown="ignore", sparse_output=True)
+        categorical_transformer = OneHotEncoder(
+            handle_unknown="ignore", sparse_output=True
+        )
     else:
-        categorical_transformer = OneHotEncoder(handle_unknown="ignore", sparse=True)
+        categorical_transformer = OneHotEncoder(
+            handle_unknown="ignore", sparse=True
+        )
 else:
     categorical_transformer = "drop"
 
 preprocess = ColumnTransformer(
     transformers=[
         ("num", numeric_transformer, numeric_features + extra_numeric),
-        *([("cat", categorical_transformer, categorical_features)] if categorical_features else []),
+        *(
+            [("cat", categorical_transformer, categorical_features)]
+            if categorical_features
+            else []
+        ),
     ]
 )
 
-# Fit nur auf Train; transformiere Split + All
+# Fit only on train
 X_train_t = preprocess.fit_transform(X_train)
 X_test_t = preprocess.transform(X_test)
 X_all_t = preprocess.transform(X)
 
-# ---------- XGBoost (schnell + stabil + imbalance-aware) ----------
-pos = y_train.sum()
-neg = y_train.shape[0] - pos
+# ---------- XGBoost ----------
+pos = int(y_train.sum())
+neg = int(y_train.shape[0] - pos)
 scale_pos_weight = float(neg / pos) if pos > 0 else 1.0
 
-# eval_metric im Konstruktor (kompatibel mit alten XGB-Versionen)
 base_model = xgb.XGBClassifier(
     n_estimators=2000,
     learning_rate=0.03,
@@ -115,10 +120,10 @@ base_model = xgb.XGBClassifier(
     n_jobs=-1,
     tree_method="hist",
     scale_pos_weight=scale_pos_weight,
-    eval_metric="logloss",
+    eval_metric="logloss",  # constructor param for older xgboost
 )
 
-# Early Stopping robust
+# Early stopping robust across versions
 try:
     base_model.fit(
         X_train_t,
@@ -129,32 +134,37 @@ try:
     )
 except TypeError:
     base_model.fit(
-        X_train_t,
-        y_train,
-        eval_set=[(X_test_t, y_test)],
-        verbose=False,
+        X_train_t, y_train, eval_set=[(X_test_t, y_test)], verbose=False
     )
 
-# ---------- Evaluation (uncalibrated) ----------
+# ---------- Eval (uncalibrated) ----------
 proba_uncal = base_model.predict_proba(X_test_t)[:, 1]
-auc_uncal = roc_auc_score(y_test, proba_uncal)
+try:
+    auc_uncal = roc_auc_score(y_test, proba_uncal)
+except ValueError:
+    auc_uncal = float("nan")
 brier_uncal = brier_score_loss(y_test, proba_uncal)
 
-# ---------- Kalibrierung (Isotonic) ----------
-if use_estimator_kw:
-    calibrator = CalibratedClassifierCV(estimator=base_model, cv="prefit", method="isotonic")
-else:
-    calibrator = CalibratedClassifierCV(base_estimator=base_model, cv="prefit", method="isotonic")
+# ---------- Calibration ----------
+CalCV = CalibratedClassifierCV
+calibrator = (
+    CalCV(estimator=base_model, cv="prefit", method="isotonic")
+    if use_estimator_kw
+    else CalCV(base_estimator=base_model, cv="prefit", method="isotonic")
+)
 calibrator.fit(X_train_t, y_train)
 
 proba_cal = calibrator.predict_proba(X_test_t)[:, 1]
-auc_cal = roc_auc_score(y_test, proba_cal)
+try:
+    auc_cal = roc_auc_score(y_test, proba_cal)
+except ValueError:
+    auc_cal = float("nan")
 brier_cal = brier_score_loss(y_test, proba_cal)
 
-# ---------- xG für alle ----------
+# ---------- xG for all ----------
 df["xG"] = calibrator.predict_proba(X_all_t)[:, 1]
 
-# ---------- Reliability-Tabelle ----------
+# ---------- Reliability table ----------
 bins = np.linspace(0, 1, 11)
 digitized = np.digitize(proba_cal, bins) - 1
 rows = []
@@ -162,17 +172,19 @@ for b in range(len(bins) - 1):
     mask = digitized == b
     if mask.sum() == 0:
         continue
-    rows.append({
-        "bin_left": bins[b],
-        "bin_right": bins[b + 1],
-        "avg_pred": proba_cal[mask].mean(),
-        "avg_true": y_test[mask].mean(),
-        "n": int(mask.sum()),
-    })
+    rows.append(
+        {
+            "bin_left": bins[b],
+            "bin_right": bins[b + 1],
+            "avg_pred": proba_cal[mask].mean(),
+            "avg_true": y_test[mask].mean(),
+            "n": int(mask.sum()),
+        }
+    )
 reliability_df = pd.DataFrame(rows)
 reliability_df.to_csv(RELIABILITY_PATH, index=False)
 
-# ---------- Kalibrations-Plot ----------
+# ---------- Calibration plot ----------
 plt.figure(figsize=(5, 5))
 plt.plot([0, 1], [0, 1], linestyle="--", linewidth=1)
 plt.scatter(reliability_df["avg_pred"], reliability_df["avg_true"])
@@ -183,7 +195,7 @@ plt.tight_layout()
 plt.savefig(CALIB_PNG, dpi=160)
 plt.close()
 
-# ---------- xG-Buckets ----------
+# ---------- xG buckets ----------
 df["xg_bucket"] = pd.cut(
     df["xG"],
     bins=[0, 0.05, 0.10, 0.20, 0.30, 1.0],
@@ -194,10 +206,10 @@ df.groupby("xg_bucket")["goal_scored"].agg(["mean", "count"]).reset_index().to_c
     XG_BUCKETS_CSV, index=False
 )
 
-# ---------- Speichern ----------
-calibrated_pipeline = SkPipeline(steps=[("prep", preprocess),
-                                        ("calibrated_clf", calibrator)
-                                        ])
+# ---------- Save ----------
+calibrated_pipeline = SkPipeline(
+    steps=[("prep", preprocess), ("calibrated_clf", calibrator)]
+)
 joblib.dump(calibrated_pipeline, MODEL_PATH)
 FEATURES_PATH.write_text("\n".join(features), encoding="utf-8")
 df.to_csv(DATA_PATH, index=False)
@@ -216,7 +228,6 @@ with open(METRIC_PATH, "w", encoding="utf-8") as f:
         f"xgboost version     : {xgb.__version__}\n"
     )
 
-# ---------- Output ----------
 print("Training complete. Summary:")
 print(f"Model:        {MODEL_PATH}")
 print(f"Metrics:      {METRIC_PATH}")
