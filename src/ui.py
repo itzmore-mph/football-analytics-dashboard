@@ -128,11 +128,9 @@ def _minute_range(df: pd.DataFrame) -> tuple[int, int]:
 
 
 def render_dashboard(root: Path) -> None:
-    # Basic Streamlit page configuration for stability and accessibility
-    st.set_page_config(
-        page_title="Football Analytics Dashboard",
-        layout="wide"
-    )
+    # NOTE: page config should be set once in the Streamlit entrypoint
+    # (streamlit_app.py). Do not call st.set_page_config here to avoid
+    # the "set_page_config can only be called once" error.
     st.title("Football Analytics Dashboard")
 
     # Persistent UI settings
@@ -227,14 +225,11 @@ def render_dashboard(root: Path) -> None:
                 elif hasattr(st, "rerun"):
                     st.rerun()
                 else:
-                    # If no rerun API found, stop this run so user can refresh
+                    st.info("Dashboard updated; please refresh the page.")
                     st.stop()
-                    st.info(
-                        "Dashboard updated; please refresh the page."
-                    )
             except Exception:
-                st.stop()
                 st.info("Dashboard updated; please refresh the page.")
+                st.stop()
 
     # --------- TABS ---------
     tabs = st.tabs(["Shot Map (xG)", "Passing Network", "Model", "Data"])
