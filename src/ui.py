@@ -10,11 +10,12 @@ import pandas as pd
 import streamlit as st
 
 from .fetch_statsbomb import fetch_competitions, fetch_matches, fetch_events
-from .passing_network import (
-    load_data as load_passes_csv,
-    create_passing_network,
-    plot_passing_network,
+from .plots import (
+    make_shot_map_plotly,
+    make_passing_network_plotly,
+    build_network_tables,
 )
+from .passing_network import load_data as load_passes_csv  # reuse robust CSV loader
 
 # ---------- helpers ----------
 
@@ -153,33 +154,21 @@ def render_dashboard(root: Path) -> None:
     # --------- TABS ---------
     tabs = st.tabs(["Shot Map (xG)", "Passing Network", "Model", "Data"])
 
-    # Tab 1: Shot Map
+    # ==== Tab 1: Shot Map (Plotly, fixed size) ====
     with tabs[0]:
         shots_csv = root / "data" / "processed_shots.csv"
         df_shots = _load_shots_df(root, _file_mtime(shots_csv))
         if df_shots.empty:
             st.info("No shots available yet. Please run the pipeline.")
         else:
-            team_options = ["All teams"] + sorted(
+            team_options = ["All teams"] + (
                 df_shots.get("team", pd.Series(dtype=str))
                 .dropna()
+                .sort_values()
                 .unique()
                 .tolist()
             )
             outcome_options = ["All shots", "Goals", "Other shots"]
-
-            # Size slider
-            size_col, _, _ = st.columns([2, 1, 1])
-            sm_scale = size_col.slider(
-                "Pitch size",
-                0.5,
-                1.2,
-                0.8,
-                0.05,
-                key=f"sm_scale_{match_id}",
-                help="Scales the representation of the Shot Map.",
-            )
-            w_sm, h_sm = 8 * sm_scale, 4.5 * sm_scale
 
             c1, c2, c3 = st.columns(3)
             team_choice = c1.selectbox(
@@ -217,46 +206,45 @@ def render_dashboard(root: Path) -> None:
                 ]
 
             if dff.empty:
-                st.warning("No shots for the selected filters.")
+                st.warning("No shots match the selected filters.")
             else:
-                try:
-                    from mplsoccer import Pitch  # heavy import
+                # Fixed figure size that fits Streamlit layout on load
+                fig = make_shot_map_plotly(
+                    dff,
+                    title="Shot Map (bubble = xG, red = goal)",
+                    fig_size=(880, 480),  # ~fits most laptop widths
+                )
+                st.plotly_chart(fig, use_container_width=False, theme="streamlit")
 
-                    pitch = Pitch(pitch_type="statsbomb", line_color="black")
-                    fig, ax = pitch.draw(figsize=(w_sm, h_sm))
-                    xg = dff.get(
-                        "xG", pd.Series([0.0] * len(dff), index=dff.index)
+                # Optional: quick table for top shooters by xG
+                if {"player", "xG"}.issubset(dff.columns):
+                    st.subheader("Top shooters by xG")
+                    tmp = dff.copy()
+                    if "goal_scored" not in tmp.columns:
+                        tmp["goal_scored"] = 0
+                    table = (
+                        tmp.groupby("player")
+                        .agg(
+                            shots=("player", "size"),
+                            goals=("goal_scored", "sum"),
+                            xg=("xG", "sum"),
+                        )
+                        .sort_values("xg", ascending=False)
+                        .head(10)
+                        .reset_index()
                     )
-                    size = (xg.clip(0, 0.8) * 420) + 14
-                    ax.scatter(dff["x"], dff["y"], s=size, alpha=0.7)
-                    ax.set_title("Shot Map (bubble size = xG)")
-                    st.pyplot(
-                        fig,
-                        clear_figure=True,
-                        use_container_width=False,
-                    )
-                except Exception as exc:  # pragma: no cover
-                    st.error(f"Plot error (Shot Map): {exc}")
+                    table["goals"] = table["goals"].astype(int)
+                    table["shots"] = table["shots"].astype(int)
+                    table["xg"] = table["xg"].round(2)
+                    st.dataframe(table, use_container_width=True)
 
-    # Tab 2: Passing Network
+    # ==== Tab 2: Passing Network (Plotly, fixed size) ====
     with tabs[1]:
-        df_pass = load_passes_csv(root / "data" / "passing_data.csv")
+        passes_path = root / "data" / "passing_data.csv"
+        df_pass = load_passes_csv(passes_path)
         if df_pass is None or df_pass.empty:
             st.info("No passing data yet. Please run the pipeline.")
         else:
-            # Size slider
-            size_col, _, _ = st.columns([2, 1, 1])
-            pn_scale = size_col.slider(
-                "Network size",
-                0.5,
-                1.2,
-                0.8,
-                0.05,
-                key=f"pn_scale_{match_id}",
-                help="Scales the representation of the Passing Network.",
-            )
-            w_pn, h_pn = 8 * pn_scale, 4.5 * pn_scale
-
             c1, c2, c3 = st.columns(3)
             min_passes = int(
                 c1.slider(
@@ -290,19 +278,34 @@ def render_dashboard(root: Path) -> None:
                     dfp = dfp.query("minute > 45")
                 dfp = dfp[(dfp["minute"] >= m1) & (dfp["minute"] <= m2)]
 
-            G = create_passing_network(
-                dfp,
-                same_team_only=True,
-                min_passes=min_passes,
-            )
-            fig = plot_passing_network(
-                G,
-                title=f"Passing Network (≥{min_passes} passes)",
-                figsize=(w_pn, h_pn),
-            )
-            st.pyplot(fig, clear_figure=True, use_container_width=False)
+            if dfp.empty:
+                st.warning("No passes match the selected filters.")
+            else:
+                nodes, edges_tbl = build_network_tables(
+                    dfp, min_passes=min_passes
+                )
+                fig = make_passing_network_plotly(
+                    nodes,
+                    edges_tbl,
+                    title=f"Passing Network (≥{min_passes} passes)",
+                    fig_size=(880, 480),  # fixed size to stay in view
+                )
+                st.plotly_chart(
+                    fig, use_container_width=False, theme="streamlit"
+                )
 
-    # Tab 3: Model
+                # Quick table for top edges
+                st.subheader("Most frequent passing links")
+                edge_table = (
+                    dfp.groupby(["passer", "receiver"])
+                    .size()
+                    .reset_index(name="passes")
+                    .sort_values("passes", ascending=False)
+                    .head(15)
+                )
+                st.dataframe(edge_table, use_container_width=True)
+
+    # ==== Tab 3: Model ====
     with tabs[2]:
         model_dir = root / "models"
         calib_png = model_dir / "xg_calibration.png"
@@ -323,7 +326,7 @@ def render_dashboard(root: Path) -> None:
             st.subheader("Metrics")
             st.code(metrics_txt.read_text(encoding="utf-8"))
 
-    # Tab 4: Data
+    # ==== Tab 4: Data ====
     with tabs[3]:
         df_shots = _load_shots_df(root)
         if df_shots.empty:

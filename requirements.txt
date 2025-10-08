@@ -1,22 +1,24 @@
-# Core data stack
-pandas>=2.1,<3
-numpy>=1.24,<3
+# Core data stack (Py 3.13 kompatibel)
+pandas>=2.2,<3
+numpy>=1.26,<3
+plotly>=5.18,<6
 
-# Plotting / pitch
-matplotlib>=3.8,<4
-mplsoccer>=1.2,<2
+# Graphs / Network
+networkx>=3.2,<4
 
-# Graphs for passing network
-networkx>=3.1,<4
-
-# Modeling
-xgboost>=1.7.6,<2.0        # avoids older fit/eval_metric quirks you saw
-scikit-learn>=1.4,<2.0     # ensures CalibratedClassifierCV(estimator=...) & OHE behavior
+# Modeling (3.13 Wheels)
+scikit-learn>=1.6.0,<1.7
+xgboost>=2.1.0,<3
 joblib>=1.3,<2
 
 # Data access
 requests>=2.31,<3
-statsbombpy>=1.7,<2        # optional; we gracefully fall back to raw GitHub if missing
+statsbombpy>=1.7,<2
 
 # App
-streamlit>=1.30,<2         # guarantees st.rerun() is available
+streamlit>=1.35,<2
+
+# Optional
+# matplotlib>=3.9,<4
+# mplsoccer>=1.2,<2
+# kaleido>=0.2.1

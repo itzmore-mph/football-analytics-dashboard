@@ -72,8 +72,8 @@ X_train, X_test, y_train, y_test = train_test_split(
 
 # ---------- sklearn version guards ----------
 major, minor = map(int, sklearn.__version__.split(".")[:2])
-use_sparse_output = (major, minor) >= (1, 2)       # OneHotEncoder change
-use_estimator_kw = (major, minor) >= (1, 4)        # CalibratedClassifierCV change
+use_sparse_output = (major, minor) >= (1, 2)
+use_estimator_kw = (major, minor) >= (1, 4)
 
 numeric_transformer = MinMaxScaler()
 if categorical_features:
@@ -202,7 +202,10 @@ df["xg_bucket"] = pd.cut(
     labels=["0-0.05", "0.05-0.10", "0.10-0.20", "0.20-0.30", "0.30+"],
     include_lowest=True,
 )
-df.groupby("xg_bucket")["goal_scored"].agg(["mean", "count"]).reset_index().to_csv(
+df.groupby(
+    "xg_bucket"
+    )
+["goal_scored"].agg(["mean", "count"]).reset_index().to_csv(
     XG_BUCKETS_CSV, index=False
 )
 
@@ -220,12 +223,12 @@ with open(METRIC_PATH, "w", encoding="utf-8") as f:
         f"Uncalibrated  Brier  : {brier_uncal:.4f}\n"
         f"Calibrated    ROC AUC: {auc_cal:.4f}\n"
         f"Calibrated    Brier  : {brier_cal:.4f}\n"
-        f"Reliability CSV     : {RELIABILITY_PATH.name}\n"
-        f"Calibration Plot    : {CALIB_PNG.name}\n"
-        f"xG Buckets          : {XG_BUCKETS_CSV.name}\n"
         f"scale_pos_weight    : {scale_pos_weight:.3f}\n"
         f"sklearn version     : {sklearn.__version__}\n"
         f"xgboost version     : {xgb.__version__}\n"
+        # f"Reliability CSV     : {RELIABILITY_PATH.name}\n"
+        # f"Calibration Plot    : {CALIB_PNG.name}\n"
+        # f"xG Buckets          : {XG_BUCKETS_CSV.name}\n"
     )
 
 print("Training complete. Summary:")

@@ -1,138 +1,236 @@
-# src/dashboard/plots.py
-from typing import Optional, Literal, Dict, Tuple
+# src/plots.py
+from __future__ import annotations
+
+from typing import Tuple
+
+import numpy as np
 import pandas as pd
-import random
-import matplotlib.pyplot as plt
-import networkx as nx
-from mplsoccer import Pitch
+import plotly.graph_objects as go
 
 
-# Shot map plot
-def plot_shot_map(df: Optional[pd.DataFrame]) -> plt.Figure:
-    """Return a pitch shot map colored by xG.
+# ---------- SHOT MAP (interactive) ----------
 
-    Args:
-        df: DataFrame with columns ['x','y','xG'], or None.
-    Raises:
-        ValueError: if df is None or missing required columns.
-    """
-    required = {"x", "y", "xG"}
-    if df is None or not required.issubset(df.columns):
-        raise ValueError("Invalid or missing shot data")
-
-    pitch = Pitch(
-        pitch_type="statsbomb", pitch_color="white", line_color="black"
-    )
-    fig, ax = pitch.draw(figsize=(8, 5))
-    scatter = ax.scatter(
-        df["x"], df["y"], c=df["xG"], cmap="Reds", edgecolors="black", s=80
-    )
-    fig.colorbar(scatter, ax=ax, label="Expected Goals (xG)")
-    return fig
-
-
-# Passing network plot
-Layout = Literal["statsbomb", "spring", "circular"]
-
-def plot_passing_network(
-    df: Optional[pd.DataFrame],
+def make_shot_map_plotly(
+    df: pd.DataFrame,
     *,
-    min_pass: int = 2,
-    layout: Layout = "statsbomb",
-    show_labels: bool = False
-) -> plt.Figure:
-    """Return a cleaned-up passing network.
-
-    Args:
-        df: DataFrame with ['passer','receiver','x','y','pass_count'].
-        min_pass: only include edges where pass_count >= this.
-        layout: "statsbomb" (use on-pitch coords), "spring", or "circular".
-        show_labels: draw every node label if True, otherwise only top-5.
-    Raises:
-        ValueError: if data is missing or no edges survive filtering.
+    title: str = "Shot Map (bubble = xG, red = goal)",
+    fig_size: Tuple[int, int] = (700, 400),
+) -> go.Figure:
     """
-    req = {"passer", "receiver", "x", "y", "pass_count"}
-    if df is None or not req.issubset(df.columns):
-        raise ValueError("No valid passing data to plot.")
-
-    # filter low-frequency links
-    df = df[df.pass_count >= min_pass]
+    Interactive shot map for StatsBomb 120x80 coordinates.
+    - Hover shows player, team, xG, minute, body part, technique, outcome.
+    - Zoom/pan enabled, fixed aspect.
+    """
     if df.empty:
-        raise ValueError(f"No links ≥ {min_pass} passes.")
+        return go.Figure()
 
-    # build directed graph
-    G = nx.DiGraph()
-    for _, r in df.iterrows():
-        G.add_edge(r.passer, r.receiver, weight=r.pass_count)
+    # Colors by outcome
+    goal_mask = (df.get("goal_scored", 0).astype(int) == 1)
+    colors = np.where(goal_mask, "crimson", "steelblue")
 
-    # prepare temporary pitch for axis limits
-    temp_pitch = Pitch(pitch_type="statsbomb", pitch_color="white", line_color="black")
-    _, temp_ax = temp_pitch.draw(figsize=(8, 5))
-    x0, x1 = temp_ax.get_xlim()
-    y0, y1 = temp_ax.get_ylim()
+    # Bubble size from xG (fallback to small bubbles if xG missing)
+    xg = df.get("xG", pd.Series(0.05, index=df.index)).clip(0, 0.9)
+    sizes = (xg * 36.0) + 6.0  # smaller dots for readability
 
-    # choose node positions
-    if layout == "statsbomb":
-        pos: Dict[str, Tuple[float, float]] = {}
-        for _, r in df.iterrows():
-            jitter_x = r.x + random.uniform(-1, 1)
-            jitter_y = r.y + random.uniform(-1, 1)
-            pos.setdefault(r.passer, (jitter_x, jitter_y))
-            pos.setdefault(r.receiver, (jitter_x, jitter_y))
-    elif layout == "spring":
-        pos = nx.spring_layout(G, weight="weight", seed=42)
-        # rescale spring coords into pitch space
-        xs = [p[0] for p in pos.values()]
-        ys = [p[1] for p in pos.values()]
-        min_x, max_x = min(xs), max(xs)
-        min_y, max_y = min(ys), max(ys)
-        for node, (x, y) in pos.items():
-            norm_x = (x - min_x) / (max_x - min_x) if max_x > min_x else 0.5
-            norm_y = (y - min_y) / (max_y - min_y) if max_y > min_y else 0.5
-            pos[node] = (x0 + norm_x * (x1 - x0), y0 + norm_y * (y1 - y0))
-    else:  # circular
-        pos = nx.circular_layout(G)
-        # rescale circular coords into pitch space
-        xs = [p[0] for p in pos.values()]
-        ys = [p[1] for p in pos.values()]
-        min_x, max_x = min(xs), max(xs)
-        min_y, max_y = min(ys), max(ys)
-        for node, (x, y) in pos.items():
-            norm_x = (x - min_x) / (max_x - min_x) if max_x > min_x else 0.5
-            norm_y = (y - min_y) / (max_y - min_y) if max_y > min_y else 0.5
-            pos[node] = (x0 + norm_x * (x1 - x0), y0 + norm_y * (y1 - y0))
-
-    # sizing
-    deg = dict(G.degree(weight="weight"))
-    min_size, max_size = 50, 500
-    sizes = {n: deg[n] for n in G.nodes()}
-    max_deg = max(sizes.values(), default=1)
-    node_sizes = [
-        min_size + (max_size - min_size) * (sizes[n]**0.5 / max_deg**0.5)
-        for n in G.nodes()
+    hovertext = [
+        "<b>{player}</b> — {team}<br>"
+        "xG: {xg:.2f} • Minute: {minute}<br>"
+        "Outcome: {outcome}<br>"
+        "Body: {body} • Tech: {tech}<br>"
+        "(x,y)=({x:.1f},{y:.1f})".format(
+            player=str(row.get("player", "")),
+            team=str(row.get("team", "")),
+            xg=float(row.get("xG", 0.0)),
+            minute=int(row.get("minute", 0)) if pd.notna(row.get("minute", None)) else 0,
+            outcome="Goal" if int(row.get("goal_scored", 0)) == 1 else "No goal",
+            body=str(row.get("body_part", "")),
+            tech=str(row.get("technique", "")),
+            x=float(row.get("x", np.nan)),
+            y=float(row.get("y", np.nan)),
+        )
+        for _, row in df.iterrows()
     ]
-    edge_widths = [d["weight"] * 0.2 for (_, _, d) in G.edges(data=True)]
 
-    # draw on a pitch
-    pitch = Pitch(pitch_type="statsbomb", pitch_color="white", line_color="black")
-    fig, ax = Pitch(pitch_type="statsbomb", pitch_color="white", line_color="black").draw(figsize=(8, 5))
-    nx.draw_networkx_edges(G, pos, ax=ax, width=edge_widths, edge_color="gray", alpha=0.5)
-    nx.draw_networkx_nodes(G, pos, ax=ax, node_size=node_sizes, node_color="steelblue", alpha=0.6)
-
-    # labels
-    if show_labels:
-        for node, (x, y) in pos.items():
-            ax.text(x, y + 1.5, node, fontsize=8, ha="center", va="bottom", color="black")
-    else:
-        # annotate only the top-5 players by betweenness
-        bet = nx.betweenness_centrality(G, weight="weight")
-        top5 = sorted(bet.items(), key=lambda x: x[1], reverse=True)[:5]
-        for player, _ in top5:
-            x, y = pos[player]
-            ax.text(
-                x, y + 0.02, player,
-                ha="center", fontsize=9,
-                color="darkred", weight="bold"
-            )
-    ax.set_title("Passing Network", pad=10)
+    fig = _pitch_figure(fig_size=fig_size)
+    fig.add_trace(
+        go.Scatter(
+            x=df["x"], y=df["y"],
+            mode="markers",
+            marker=dict(size=sizes, color=colors, opacity=0.75, line=dict(width=0)),
+            hovertext=hovertext,
+            hoverinfo="text",
+            name="Shots",
+        )
+    )
+    fig.update_layout(title=title, legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0))
     return fig
+
+
+def _pitch_figure(*, fig_size: Tuple[int, int] = (700, 400)) -> go.Figure:
+    """StatsBomb 120x80 pitch as Plotly shapes with equal aspect."""
+    w, h = fig_size
+    fig = go.Figure()
+    # Outer boundaries
+    shapes = [
+        dict(type="rect", x0=0, y0=0, x1=120, y1=80, line=dict(color="black", width=1), fillcolor="white"),
+        # Halfway line
+        dict(type="line", x0=60, y0=0, x1=60, y1=80, line=dict(color="black", width=1)),
+        # Penalty boxes
+        dict(type="rect", x0=0, y0=18, x1=18, y1=62, line=dict(color="black", width=1)),
+        dict(type="rect", x0=102, y0=18, x1=120, y1=62, line=dict(color="black", width=1)),
+        # Six-yard boxes
+        dict(type="rect", x0=0, y0=30, x1=6, y1=50, line=dict(color="black", width=1)),
+        dict(type="rect", x0=114, y0=30, x1=120, y1=50, line=dict(color="black", width=1)),
+        # Goals (on pitch edge)
+        dict(type="rect", x0=-1, y0=36, x1=0, y1=44, line=dict(color="black", width=1)),
+        dict(type="rect", x0=120, y0=36, x1=121, y1=44, line=dict(color="black", width=1)),
+        # Center circle (approx)
+        dict(type="circle", x0=60-10, y0=40-10, x1=60+10, y1=40+10, line=dict(color="black", width=1)),
+        # Spots
+        dict(type="circle", x0=60-0.4, y0=40-0.4, x1=60+0.4, y1=40+0.4, line=dict(color="black", width=1)),
+        dict(type="circle", x0=12-0.4, y0=40-0.4, x1=12+0.4, y1=40+0.4, line=dict(color="black", width=1)),
+        dict(type="circle", x0=108-0.4, y0=40-0.4, x1=108+0.4, y1=40+0.4, line=dict(color="black", width=1)),
+    ]
+    fig.update_layout(
+        width=w, height=h,
+        xaxis=dict(range=[-1, 121], showgrid=False, zeroline=False, constrain="domain", scaleanchor="y", scaleratio=1),
+        yaxis=dict(range=[-1, 81], showgrid=False, zeroline=False),
+        shapes=shapes,
+        plot_bgcolor="white",
+        paper_bgcolor="white",
+        margin=dict(l=10, r=10, t=50, b=10),
+    )
+    return fig
+
+
+# ---------- PASSING NETWORK (interactive) ----------
+
+def make_passing_network_plotly(
+    nodes: pd.DataFrame,
+    edges: pd.DataFrame,
+    *,
+    title: str = "Passing Network",
+    fig_size: Tuple[int, int] = (700, 400),
+) -> go.Figure:
+    """
+    Interactive passing network from pre-computed nodes (player, x, y, size, label) and edges (x0,y0,x1,y1,w,label).
+    - Hover on nodes: player + centrality/degree
+    - Hover on edges: passer → receiver + passes
+    """
+    w, h = fig_size
+    fig = _pitch_figure(fig_size=(w, h))
+
+    # Edges first
+    if not edges.empty:
+        fig.add_trace(
+            go.Scatter(
+                x=np.r_[edges["x0"], edges["x1"], [None]].reshape(-1, 3).ravel(),
+                y=np.r_[edges["y0"], edges["y1"], [None]].reshape(-1, 3).ravel(),
+                mode="lines",
+                line=dict(width=edges["w"].clip(lower=0.6, upper=6).tolist(), color="black"),
+                hovertext=edges["label"],
+                hoverinfo="text",
+                opacity=0.65,
+                showlegend=False,
+            )
+        )
+
+    # Nodes on top
+    if not nodes.empty:
+        fig.add_trace(
+            go.Scatter(
+                x=nodes["x"], y=nodes["y"],
+                mode="markers+text",
+                text=nodes["label"],
+                textposition="top center",
+                marker=dict(
+                    size=nodes["size"].clip(lower=6, upper=36),
+                    color="royalblue",
+                    opacity=0.85,
+                    line=dict(color="white", width=1),
+                ),
+                hovertext=nodes["hover"],
+                hoverinfo="text",
+                showlegend=False,
+            )
+        )
+
+    fig.update_layout(title=title)
+    return fig
+
+
+def build_network_tables(df: pd.DataFrame, min_passes: int = 2) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """
+    From raw pass dataframe, compute:
+    - nodes: x,y per player + size by betweenness; hover text
+    - edges: segments x0,y0 -> x1,y1, width by weight; hover text
+    """
+    if df.empty:
+        return pd.DataFrame(), pd.DataFrame()
+
+    # Positions: mean start for passer, mean end for receiver; average both for anchor
+    sx = "start_x" if "start_x" in df.columns else "x"
+    sy = "start_y" if "start_y" in df.columns else "y"
+    start = df.groupby("passer")[[sx, sy]].mean(numeric_only=True).rename(columns={sx: "sx", sy: "sy"})
+    end = df.groupby("receiver")[["end_x", "end_y"]].mean(numeric_only=True) if {"end_x", "end_y"}.issubset(df.columns) else None
+
+    players = sorted(set(df["passer"]) | set(df["receiver"]))
+    pos = pd.DataFrame(index=players)
+    pos = pos.join(start, how="left")
+    if end is not None:
+        pos = pos.join(end.rename(columns={"end_x": "rx", "end_y": "ry"}), how="left")
+        pos["x"] = pos[["sx", "rx"]].mean(axis=1, skipna=True)
+        pos["y"] = pos[["sy", "ry"]].mean(axis=1, skipna=True)
+    else:
+        pos["x"], pos["y"] = pos["sx"], pos["sy"]
+    pos["x"] = pos["x"].fillna(60.0).clip(0, 120)
+    pos["y"] = pos["y"].fillna(40.0).clip(0, 80)
+
+    # Edge weights
+    edges = (
+        df.groupby(["passer", "receiver"], dropna=True)
+        .size()
+        .reset_index(name="weight")
+    )
+    edges = edges[(edges["passer"] != edges["receiver"]) & edges["receiver"].notna()]
+    if min_passes > 1:
+        edges = edges[edges["weight"] >= min_passes]
+
+    # Graph + betweenness
+    import networkx as nx
+    G = nx.DiGraph()
+    for p, r, w in edges[["passer", "receiver", "weight"]].itertuples(index=False):
+        G.add_edge(p, r, weight=float(w))
+    cent = nx.betweenness_centrality(G, weight="weight", normalized=True) if G.number_of_edges() else {}
+
+    # Tables for plotting
+    nodes = pd.DataFrame({
+        "player": players,
+        "x": [float(pos.at[p, "x"]) for p in players],
+        "y": [float(pos.at[p, "y"]) for p in players],
+        "size": [max(cent.get(p, 0.0), 0.01) * 36.0 for p in players],  # scale for visibility
+        "label": players,
+        "hover": [
+            f"<b>{p}</b><br>Betweenness: {cent.get(p, 0.0):.3f}"
+            for p in players
+        ],
+    })
+
+    # Edge segments into x0,y0,x1,y1 + width mapping
+    def width_map(w: float) -> float:
+        # map min..max to roughly 0.6..6 px for clarity
+        return 0.6 + 0.6 * np.log1p(max(w, 1.0))
+
+    rows = []
+    for passer, receiver, w in edges[["passer", "receiver", "weight"]].itertuples(index=False):
+        if passer not in pos.index or receiver not in pos.index:
+            continue
+        rows.append({
+            "x0": float(pos.at[passer, "x"]), "y0": float(pos.at[passer, "y"]),
+            "x1": float(pos.at[receiver, "x"]), "y1": float(pos.at[receiver, "y"]),
+            "w": width_map(float(w)),
+            "label": f"{passer} → {receiver}<br>Passes: {int(w)}",
+        })
+    edges_tbl = pd.DataFrame(rows)
+
+    return nodes, edges_tbl

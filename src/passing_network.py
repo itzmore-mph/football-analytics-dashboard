@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Dict, Tuple
 
 import pandas as pd
 import networkx as nx
@@ -31,7 +30,8 @@ def _coerce_numeric(df: pd.DataFrame, cols: list[str]) -> pd.DataFrame:
 def load_data(path: Path = DATA_PATH) -> pd.DataFrame | None:
     """
     Load passing CSV and return a clean DataFrame with at least:
-    ['passer','receiver','x','y'] and, if available, ['start_x','start_y','end_x','end_y','minute'].
+    ['passer','receiver','x','y']
+    and, if available, ['start_x','start_y','end_x','end_y','minute'].
     """
     for candidate in _candidate_paths(path):
         if not candidate.exists():
@@ -42,17 +42,34 @@ def load_data(path: Path = DATA_PATH) -> pd.DataFrame | None:
         required = {"passer", "receiver", "x", "y"}
         missing = required - set(df.columns)
         if missing:
-            print(f"Error: Passing data is missing required columns: {missing}")
+            print(
+                f"Error: Passing data is missing required columns: {missing}"
+                  )
             continue
 
         # Basic hygiene
         # Normalize player/team names
-        for col in ["passer", "receiver", "team", "team_passer", "team_receiver"]:
+        for col in [
+            "passer",
+            "receiver",
+            "team",
+            "team_passer",
+            "team_receiver"
+                ]:
             if col in df.columns:
                 df[col] = df[col].astype(str).str.strip()
 
         # Coerce numerics
-        num_cols = ["x", "y", "start_x", "start_y", "end_x", "end_y", "minute", "second"]
+        num_cols = [
+            "x",
+            "y",
+            "start_x",
+            "start_y",
+            "end_x",
+            "end_y",
+            "minute",
+            "second"
+        ]
         df = _coerce_numeric(df, num_cols)
 
         # Drop obvious invalids and limit to pitch
@@ -74,22 +91,32 @@ def load_data(path: Path = DATA_PATH) -> pd.DataFrame | None:
 
 def _mean_positions(df: pd.DataFrame) -> dict[str, tuple[float, float]]:
     """
-    Player anchor positions = mean of start pos (as passer) and end pos (as receiver).
-    Falls back to start positions only when end positions are unavailable.
+    Player anchor positions = mean of start pos (as passer)
+    and end pos (as receiver).
+    Falls back to start positions
+    only when end positions are unavailable.
     """
     start_x_col = "start_x" if "start_x" in df.columns else "x"
     start_y_col = "start_y" if "start_y" in df.columns else "y"
 
-    start_pos = df.groupby("passer")[[start_x_col, start_y_col]].mean(numeric_only=True)
+    start_pos = df.groupby(
+        "passer"
+        )
+    [[start_x_col, start_y_col]].mean(numeric_only=True)
     start_pos.columns = ["sx", "sy"]
 
     has_end = {"end_x", "end_y"}.issubset(df.columns)
     players = pd.Index(sorted(set(df["passer"]) | set(df["receiver"])))
 
     if has_end:
-        recv_pos = df.groupby("receiver")[["end_x", "end_y"]].mean(numeric_only=True)
+        recv_pos = df.groupby(
+            "receiver"
+            )
+        [["end_x", "end_y"]].mean(numeric_only=True)
         recv_pos.columns = ["rx", "ry"]
-        pos = pd.DataFrame(index=players).join(start_pos, how="left").join(recv_pos, how="left")
+        pos = pd.DataFrame(
+            index=players
+            ).join(start_pos, how="left").join(recv_pos, how="left")
         pos["x"] = pos[["sx", "rx"]].mean(axis=1, skipna=True)
         pos["y"] = pos[["sy", "ry"]].mean(axis=1, skipna=True)
     else:
@@ -101,7 +128,10 @@ def _mean_positions(df: pd.DataFrame) -> dict[str, tuple[float, float]]:
     pos["x"] = pos["x"].fillna(60.0)
     pos["y"] = pos["y"].fillna(40.0)
 
-    return {p: (float(pos.at[p, "x"]), float(pos.at[p, "y"])) for p in pos.index}
+    return {
+        p: (float(pos.at[p, "x"]),
+            float(pos.at[p, "y"])) for p in pos.index
+        }
 
 
 def create_passing_network(
@@ -111,7 +141,7 @@ def create_passing_network(
     min_passes: int = 2,
 ) -> nx.DiGraph:
     """
-    Build a directed graph of passes. Edge weight = pass count from passer -> receiver.
+    Build a directed graph of passes.
     """
     team_p_col = "team_passer" if "team_passer" in df.columns else ("team" if "team" in df.columns else None)
     team_r_col = "team_receiver" if "team_receiver" in df.columns else ("team" if "team" in df.columns else None)
