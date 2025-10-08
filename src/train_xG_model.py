@@ -203,11 +203,13 @@ df["xg_bucket"] = pd.cut(
     labels=["0-0.05", "0.05-0.10", "0.10-0.20", "0.20-0.30", "0.30+"],
     include_lowest=True,
 )
-df.groupby(
-    "xg_bucket"
-    )
-["goal_scored"].agg(["mean", "count"]).reset_index().to_csv(
-    XG_BUCKETS_CSV, index=False
+
+# IMPORTANT: keep the chain intact
+(
+    df.groupby("xg_bucket", observed=False)["goal_scored"]
+      .agg(["mean", "count"])
+      .reset_index()
+      .to_csv(XG_BUCKETS_CSV, index=False)
 )
 
 # ---------- Save ----------
