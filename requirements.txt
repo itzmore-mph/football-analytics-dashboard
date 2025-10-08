@@ -1,8 +1,10 @@
-# Core data stack (Py 3.13 kompatibel)
+# Core data stack (Python 3.13-compatible ranges)
 pandas>=2.2,<3
 numpy>=1.26,<3
+
+# Plotting
 plotly>=5.18,<6
-setuptools>=68.0,<69
+matplotlib>=3.9,<4
 
 # Graphs / Network
 networkx>=3.2,<4
@@ -18,9 +20,12 @@ requests>=2.31,<3
 # App
 streamlit>=1.35,<2
 
-# Visualization / optional extras
-matplotlib>=3.9,<4
+# Graphs / Network
+networkx>=3.2,<4
 mplsoccer>=1.2,<2
+
+# Utilities
+setuptools>=68.0,<70
 kaleido>=0.2.1
 
 # Testing

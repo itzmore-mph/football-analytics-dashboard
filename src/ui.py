@@ -2,8 +2,10 @@
 from __future__ import annotations
 
 import os
+import re
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 import pandas as pd
@@ -42,6 +44,22 @@ def _run_py(script: Path) -> None:
         st.error(res.stderr or "Unknown error")
     elif res.stdout:
         st.code(res.stdout.strip(), language="bash")
+
+
+def _safe_parse_match_id(label: str) -> int | None:
+    """
+    Extract match_id from label robustly using regex 'id=123'
+    or trailing '(id=123)'.
+    """
+    if not label:
+        return None
+    m = re.search(r"id=(\d+)", label)
+    if m:
+        try:
+            return int(m.group(1))
+        except ValueError:
+            return None
+    return None
 
 
 def _comp_label(row: pd.Series) -> str:
@@ -110,7 +128,18 @@ def _minute_range(df: pd.DataFrame) -> tuple[int, int]:
 
 
 def render_dashboard(root: Path) -> None:
+    # Basic Streamlit page configuration for stability and accessibility
+    st.set_page_config(
+        page_title="Football Analytics Dashboard",
+        layout="wide"
+    )
     st.title("Football Analytics Dashboard")
+
+    # Persistent UI settings
+    if "fig_size" not in st.session_state:
+        st.session_state["fig_size"] = (880, 480)
+    if "last_pipeline_mtime" not in st.session_state:
+        st.session_state["last_pipeline_mtime"] = 0.0
 
     with st.expander("Pick a Match", expanded=False):
         # 1) Competitions
@@ -154,10 +183,16 @@ def render_dashboard(root: Path) -> None:
             return
 
         matches["label"] = matches.apply(_match_label, axis=1)
-        match_choice = st.selectbox(
-            "Match", matches["label"].tolist(), key="picker_match"
+        # Provide mapping so selection stores the actual match_id
+        labels = matches["label"].tolist()
+        ids = matches["match_id"].astype(int).tolist()
+        select_idx = st.selectbox(
+            "Match",
+            options=list(range(len(labels))),
+            format_func=lambda i: labels[i],
+            key="picker_match",
         )
-        match_id = int(match_choice.split("id=")[-1].rstrip(")"))
+        match_id = int(ids[select_idx])
 
         # 3) Trigger pipeline
         if st.button("Update Dashboard", use_container_width=True):
@@ -178,12 +213,15 @@ def render_dashboard(root: Path) -> None:
                 extract_shot_data(match_id=match_id)
                 fetch_passes(match_id=match_id)
 
+                # Run preprocessing and training scripts and surface logs.
                 _run_py(root / "src" / "preprocess_xG.py")
                 _run_py(root / "src" / "train_xG_model.py")
 
             st.success("Pipeline updated.")
-            st.cache_data.clear()
-            st.rerun()
+            # Avoid clearing all app caches
+            st.session_state["last_pipeline_mtime"] = time.time()
+            # Force a rerun so UI reflects new data
+            st.experimental_rerun()
 
     # --------- TABS ---------
     tabs = st.tabs(["Shot Map (xG)", "Passing Network", "Model", "Data"])
@@ -191,7 +229,13 @@ def render_dashboard(root: Path) -> None:
     # ==== Tab 1: Shot Map (Plotly, fixed size) ====
     with tabs[0]:
         shots_csv = root / "data" / "processed_shots.csv"
-        df_shots, shot_issues = _load_shots_df(root, _file_mtime(shots_csv))
+        # Provide mtime key to the cached loader to avoid global cache clearing
+        df_shots, shot_issues = _load_shots_df(
+            root, max(
+                _file_mtime(shots_csv),
+                float(st.session_state.get("last_pipeline_mtime", 0.0))
+            )
+        )
         for issue in shot_issues:
             st.warning(issue)
         if df_shots.empty:
@@ -247,11 +291,22 @@ def render_dashboard(root: Path) -> None:
                 msg = sample_size_warning(dff, threshold=8)
                 if msg:
                     st.info(msg)
-                # Fixed figure size that fits Streamlit layout on load
+                # Let user choose compact / wide or keep persisted fig size
+                with st.expander("Display options", expanded=False):
+                    choice = st.radio(
+                        "Layout",
+                        ("Persisted", "Compact", "Wide"),
+                        index=0,
+                        key=f"sm_layout_{match_id}",
+                    )
+                    if choice == "Compact":
+                        st.session_state["fig_size"] = (700, 420)
+                    elif choice == "Wide":
+                        st.session_state["fig_size"] = (1100, 600)
                 fig = make_shot_map_plotly(
                     dff,
                     title="Shot Map (bubble = xG, red = goal)",
-                    fig_size=(880, 480),  # ~fits most laptop widths
+                    fig_size=st.session_state["fig_size"],
                 )
                 st.plotly_chart(
                     fig,
@@ -336,7 +391,7 @@ def render_dashboard(root: Path) -> None:
                     nodes,
                     edges_tbl,
                     title=f"Passing Network (≥{min_passes} passes)",
-                    fig_size=(880, 480),  # fixed size to stay in view
+                    fig_size=st.session_state["fig_size"],
                 )
                 st.plotly_chart(
                     fig, use_container_width=False, theme="streamlit"

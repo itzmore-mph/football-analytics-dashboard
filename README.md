@@ -15,11 +15,11 @@ football-analytics-dashboard/
 ├── data/                         # Raw & processed datasets (not tracked in git)
 ├── models/                       # Trained ML models
 ├── src/
-│   ├── dashboard/                # Streamlit page assembly & charts
-│   │   ├── __init__.py
-│   │   ├── app.py
-│   │   ├── data.py
-│   │   └── plots.py
+│   ├── dashboard/                # Streamlit page assembly & charts (package)
+│   │   ├── __init__.py           # compatibility layer that re-exports legacy functions
+│   │   ├── app.py                # small app-level wrappers
+│   │   ├── data.py               # network/data wrappers
+│   │   └── plots.py              # plotting wrappers
 │   ├── fetch_passing_data.py     # Extract passing data from raw JSON
 │   ├── fetch_shots_data.py       # Extract shot data from raw JSON
 │   ├── fetch_statsbomb.py        # Fetch match data from StatsBomb

@@ -1,10 +1,9 @@
 # tests/conftest.py
 
-from __future__ import annotations
+import importlib
 
-import sys
-from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[1]
-if str(ROOT) not in sys.path:
-    sys.path.insert(0, str(ROOT))
+def test_streamlit_app_importable():
+    # Import via importlib so flake8 sees importlib used
+    mod = importlib.import_module("streamlit_app")
+    assert mod is not None
