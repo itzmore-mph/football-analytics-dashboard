@@ -18,12 +18,11 @@ from .fetch_statsbomb import (
     fetch_events,
     StatsBombFetchError,
 )
-from .plots import (
+from .dashboard.plots import (
     make_shot_map_plotly,
     make_passing_network_plotly,
     build_network_tables,
 )
-
 from .passing_network import load_data as load_passes_csv
 from .validation import validate_shots, sample_size_warning
 
