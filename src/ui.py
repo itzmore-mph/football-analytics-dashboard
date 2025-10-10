@@ -304,8 +304,10 @@ def render_dashboard(root: Path) -> None:
                     fig_size=FIG_SIZE,  # feste, optimierte Größe
                 )
                 st.plotly_chart(
-                    fig, use_container_width=False, theme="streamlit"
-                )
+                    fig,
+                    width="content",   # was: use_container_width=False
+                    theme="streamlit",
+                    )
 
                 if {"player", "xG"}.issubset(dff.columns):
                     st.subheader("Top shooters by xG")
@@ -401,9 +403,10 @@ def render_dashboard(root: Path) -> None:
                     fig_size=FIG_SIZE,  # feste, optimierte Größe
                 )
                 st.plotly_chart(
-                    fig, use_container_width=False, theme="streamlit"
+                    fig,
+                    width="content",   # was: use_container_width=False
+                    theme="streamlit",
                 )
-
                 st.subheader("Most frequent passing links")
                 edge_table = (
                     dfp.groupby(["passer", "receiver"])

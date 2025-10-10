@@ -49,7 +49,7 @@ def make_shot_map_plotly(
             x=df["x"],
             y=df["y"],
             mode="markers",
-            marker=dict(size=sizes, color=colors, opacity=0.75, line=dict(width=0)),
+            marker=dict(size=sizes, color=colors, opacity=0.75, line=dict(width=1.8)),
             hovertext=hovertext,
             hoverinfo="text",
             name="Shots",
@@ -118,38 +118,52 @@ def make_passing_network_plotly(
     title: str = "Passing Network",
     fig_size: Tuple[int, int] = (880, 480),
 ) -> go.Figure:
-    w, h = fig_size
-    fig = _pitch_figure(fig_size=(w, h))
+    """
+    Interactive passing network from pre-computed nodes (player,x,y,size,label)
+    and edges (x0,y0,x1,y1,w,label). Edges are bucketed by width so each
+    Plotly trace has a single numeric line.width (required by Plotly).
+    """
+    fig = _pitch_figure(fig_size=fig_size)
 
-    # Edges first
+    # ---- EDGES (bucket by width) ----
     if not edges.empty:
-        n = len(edges)
-        xs = np.empty(n * 3, dtype=float)
-        ys = np.empty(n * 3, dtype=float)
-        xs[0::3] = edges["x0"].to_numpy(dtype=float)
-        xs[1::3] = edges["x1"].to_numpy(dtype=float)
-        xs[2::3] = np.nan
-        ys[0::3] = edges["y0"].to_numpy(dtype=float)
-        ys[1::3] = edges["y1"].to_numpy(dtype=float)
-        ys[2::3] = np.nan
+        # Round widths to 1 decimal to reduce number of traces
+        edges = edges.copy()
+        edges["w_round"] = edges["w"].astype(float).round(1)
 
-        fig.add_trace(
-            go.Scatter(
-                x=xs,
-                y=ys,
-                mode="lines",
-                line=dict(
-                    width=edges["w"].clip(lower=0.8, upper=8).tolist(),
-                    color="black",
-                ),
-                hovertext=edges["label"],
-                hoverinfo="text",
-                opacity=0.70,
-                showlegend=False,
+        for w_val, grp in edges.groupby("w_round", sort=True):
+            # Interleave coordinates for segments:
+            n = len(grp)
+            xs = np.empty(n * 3, dtype=float)
+            ys = np.empty(n * 3, dtype=float)
+            xs[0::3] = grp["x0"].to_numpy(dtype=float)
+            xs[1::3] = grp["x1"].to_numpy(dtype=float)
+            xs[2::3] = np.nan
+            ys[0::3] = grp["y0"].to_numpy(dtype=float)
+            ys[1::3] = grp["y1"].to_numpy(dtype=float)
+            ys[2::3] = np.nan
+
+            # Hover text: repeat each label + a trailing blank for the NaN gap
+            hover = np.empty(n * 3, dtype=object)
+            hover[0::3] = grp["label"].to_numpy(dtype=object)
+            hover[1::3] = grp["label"].to_numpy(dtype=object)
+            hover[2::3] = ""
+
+            fig.add_trace(
+                go.Scatter(
+                    x=xs,
+                    y=ys,
+                    mode="lines",
+                    line=dict(width=float(max(w_val, 0.6)), color="black"),
+                    opacity=0.65,
+                    hoverinfo="text",
+                    hovertext=hover,
+                    showlegend=False,
+                    name=f"w={w_val}",
+                )
             )
-        )
 
-    # Nodes on top
+    # ---- NODES ----
     if not nodes.empty:
         fig.add_trace(
             go.Scatter(
@@ -159,14 +173,15 @@ def make_passing_network_plotly(
                 text=nodes["label"],
                 textposition="top center",
                 marker=dict(
-                    size=nodes["size"].clip(lower=6, upper=40),
+                    size=nodes["size"].clip(lower=6, upper=36),
                     color="royalblue",
-                    opacity=0.90,
-                    line=dict(color="white", width=1),
+                    opacity=0.9,
+                    line=dict(color="white", width=1.8),
                 ),
                 hovertext=nodes["hover"],
                 hoverinfo="text",
                 showlegend=False,
+                name="players",
             )
         )
 
