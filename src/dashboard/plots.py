@@ -7,6 +7,8 @@ import plotly.graph_objects as go
 import networkx as nx
 
 # ---------- SHOT MAP (interactive) ----------
+
+
 def make_shot_map_plotly(
     df: pd.DataFrame,
     *,
@@ -33,8 +35,14 @@ def make_shot_map_plotly(
             player=str(row.get("player", "")),
             team=str(row.get("team", "")),
             xg=float(row.get("xG", 0.0)),
-            minute=int(row.get("minute", 0)) if pd.notna(row.get("minute", None)) else 0,
-            outcome="Goal" if int(row.get("goal_scored", 0)) == 1 else "No goal",
+            minute=(
+                int(row.get("minute", 0))
+                if pd.notna(row.get("minute", None))
+                else 0
+            ),
+            outcome=(
+                "Goal" if int(row.get("goal_scored", 0)) == 1 else "No goal"
+            ),
             body=str(row.get("body_part", "")),
             tech=str(row.get("technique", "")),
             x=float(row.get("x", np.nan)),
@@ -49,7 +57,12 @@ def make_shot_map_plotly(
             x=df["x"],
             y=df["y"],
             mode="markers",
-            marker=dict(size=sizes, color=colors, opacity=0.75, line=dict(width=1.8)),
+            marker=dict(
+                size=sizes,
+                color=colors,
+                opacity=0.75,
+                line=dict(width=1.8),
+            ),
             hovertext=hovertext,
             hoverinfo="text",
             name="Shots",
@@ -57,7 +70,13 @@ def make_shot_map_plotly(
     )
     fig.update_layout(
         title=title,
-        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0),
+        legend=dict(
+            orientation="h",
+            yanchor="bottom",
+            y=1.02,
+            xanchor="left",
+            x=0,
+        ),
     )
     return fig
 
@@ -70,7 +89,15 @@ def _pitch_figure(*, fig_size: Tuple[int, int] = (880, 480)) -> go.Figure:
 
     shapes = [
         # Outer boundaries
-        dict(type="rect", x0=0, y0=0, x1=120, y1=80, line=line, fillcolor="white"),
+        dict(
+            type="rect",
+            x0=0,
+            y0=0,
+            x1=120,
+            y1=80,
+            line=line,
+            fillcolor="white",
+        ),
         # Halfway line
         dict(type="line", x0=60, y0=0, x1=60, y1=80, line=line),
         # Penalty boxes
@@ -101,7 +128,12 @@ def _pitch_figure(*, fig_size: Tuple[int, int] = (880, 480)) -> go.Figure:
             scaleratio=1,
             fixedrange=True,
         ),
-        yaxis=dict(range=[-1, 81], showgrid=False, zeroline=False, fixedrange=True),
+        yaxis=dict(
+            range=[-1, 81],
+            showgrid=False,
+            zeroline=False,
+            fixedrange=True,
+        ),
         shapes=shapes,
         plot_bgcolor="white",
         paper_bgcolor="white",
@@ -206,7 +238,9 @@ def build_network_tables(
     )
 
     if {"end_x", "end_y"}.issubset(df.columns):
-        end = df.groupby("receiver")[["end_x", "end_y"]].mean(numeric_only=True)
+        end = df.groupby("receiver")[["end_x", "end_y"]].mean(
+            numeric_only=True
+        )
         end = end.rename(columns={"end_x": "rx", "end_y": "ry"})
     else:
         end = None
@@ -230,14 +264,22 @@ def build_network_tables(
         .size()
         .reset_index(name="weight")
     )
-    edges = edges[(edges["passer"] != edges["receiver"]) & edges["receiver"].notna()]
+    edges = edges[
+        (edges["passer"] != edges["receiver"]) & edges["receiver"].notna()
+    ]
     if min_passes > 1:
         edges = edges[edges["weight"] >= min_passes]
 
     G = nx.DiGraph()
-    for passer, receiver, w in edges[["passer", "receiver", "weight"]].itertuples(index=False):
+    for passer, receiver, w in edges[
+        ["passer", "receiver", "weight"]
+    ].itertuples(index=False):
         G.add_edge(passer, receiver, weight=float(w))
-    cent = nx.betweenness_centrality(G, weight="weight", normalized=True) if G.number_of_edges() else {}
+    cent = (
+        nx.betweenness_centrality(G, weight="weight", normalized=True)
+        if G.number_of_edges()
+        else {}
+    )
 
     nodes = pd.DataFrame({
         "player": players,
@@ -245,14 +287,22 @@ def build_network_tables(
         "y": [float(pos.at[p, "y"]) for p in players],
         "size": [max(cent.get(p, 0.0), 0.01) * 36.0 for p in players],
         "label": players,
-        "hover": [f"<b>{p}</b><br>Betweenness: {cent.get(p, 0.0):.3f}" for p in players],
+        "hover": [
+            (
+                f"<b>{p}</b><br>"
+                f"Betweenness: {cent.get(p, 0.0):.3f}"
+            )
+            for p in players
+        ],
     })
 
     def width_map(w: float) -> float:
         return 0.8 + 0.7 * np.log1p(max(w, 1.0))
 
     rows = []
-    for passer, receiver, w in edges[["passer", "receiver", "weight"]].itertuples(index=False):
+    for passer, receiver, w in edges[
+        ["passer", "receiver", "weight"]
+    ].itertuples(index=False):
         if passer not in pos.index or receiver not in pos.index:
             continue
         rows.append({
