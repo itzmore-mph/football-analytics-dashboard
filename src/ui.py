@@ -7,6 +7,7 @@ import subprocess
 import sys
 import time
 from pathlib import Path
+from typing import Tuple
 
 import pandas as pd
 import streamlit as st
@@ -17,23 +18,28 @@ from .fetch_statsbomb import (
     fetch_events,
     StatsBombFetchError,
 )
-from .dashboard import (
+from .plots import (
     make_shot_map_plotly,
     make_passing_network_plotly,
     build_network_tables,
 )
+
 from .passing_network import load_data as load_passes_csv
 from .validation import validate_shots, sample_size_warning
 
+
+# ---------- Konstanten ----------
+FIG_SIZE: Tuple[int, int] = (900, 520)  # optimierte Standardgröße für
+# “in view”
+
+
 # ---------- helpers ----------
-
-
 def _run_py(script: Path) -> None:
     """Run a Python script and show stdout/stderr in Streamlit."""
     env = os.environ.copy()
     env["PYTHONIOENCODING"] = "utf-8"
 
-    res = subprocess.run(  # noqa: S603,S607 (local script)
+    res = subprocess.run(  # noqa: S603,S607
         [sys.executable, str(script)],
         capture_output=True,
         text=True,
@@ -47,10 +53,7 @@ def _run_py(script: Path) -> None:
 
 
 def _safe_parse_match_id(label: str) -> int | None:
-    """
-    Extract match_id from label robustly using regex 'id=123'
-    or trailing '(id=123)'.
-    """
+    """Extract match_id from label using regex 'id=123'."""
     if not label:
         return None
     m = re.search(r"id=(\d+)", label)
@@ -93,7 +96,8 @@ def _file_mtime(p: Path) -> float:
 
 @st.cache_data
 def _load_shots_df(
-    root: Path, mtime: float | None = None
+    root: Path,
+    mtime: float | None = None,
 ) -> tuple[pd.DataFrame, list[str]]:
     """
     Cached loader for processed_shots.csv.
@@ -101,18 +105,20 @@ def _load_shots_df(
     """
     csv_path = root / "data" / "processed_shots.csv"
     if mtime is None:
-        mtime = _file_mtime(csv_path)  # used only to key the cache
+        mtime = _file_mtime(csv_path)  # key for cache
     _ = mtime
 
     if not csv_path.exists():
         return pd.DataFrame(), []
     df = pd.read_csv(csv_path)
+
     needed = {"x", "y", "goal_scored"}
     if not needed.issubset(df.columns):
-        return pd.DataFrame(), [
+        return df.iloc[0:0], [
             "processed_shots.csv missing columns: "
             + ", ".join(sorted(needed - set(df.columns)))
         ]
+
     validated = validate_shots(df)
     return validated.frame, validated.issues
 
@@ -125,20 +131,14 @@ def _minute_range(df: pd.DataFrame) -> tuple[int, int]:
 
 
 # ---------- main UI ----------
-
-
 def render_dashboard(root: Path) -> None:
-    # NOTE: page config should be set once in the Streamlit entrypoint
-    # (streamlit_app.py). Do not call st.set_page_config here to avoid
-    # the "set_page_config can only be called once" error.
+    # set_page_config bitte im Entry-Point (streamlit_app.py) setzen
     st.title("Football Analytics Dashboard")
 
-    # Persistent UI settings
-    if "fig_size" not in st.session_state:
-        st.session_state["fig_size"] = (880, 480)
     if "last_pipeline_mtime" not in st.session_state:
         st.session_state["last_pipeline_mtime"] = 0.0
 
+    # ---------------- Pick a Match ----------------
     with st.expander("Pick a Match", expanded=False):
         # 1) Competitions
         try:
@@ -150,6 +150,7 @@ def render_dashboard(root: Path) -> None:
             )
             st.caption(str(exc))
             st.stop()
+
         comps = _read_json(root / "data" / "competitions.json")
         if comps.empty:
             st.warning("Could not load competitions.json.")
@@ -158,7 +159,9 @@ def render_dashboard(root: Path) -> None:
         comps = comps.sort_values(["competition_name", "season_name"])
         comp_labels = comps.apply(_comp_label, axis=1).tolist()
         comp_choice = st.selectbox(
-            "Competition / Season", comp_labels, key="picker_comp_season"
+            "Competition / Season",
+            comp_labels,
+            key="picker_comp_season",
         )
         sel = comps.iloc[comp_labels.index(comp_choice)]
         comp_id = int(sel.competition_id)
@@ -173,6 +176,7 @@ def render_dashboard(root: Path) -> None:
             )
             st.caption(str(exc))
             st.stop()
+
         matches = _read_json(
             root / "data" / "matches" / str(comp_id) / f"{season_id}.json"
         )
@@ -181,7 +185,6 @@ def render_dashboard(root: Path) -> None:
             return
 
         matches["label"] = matches.apply(_match_label, axis=1)
-        # Provide mapping so selection stores the actual match_id
         labels = matches["label"].tolist()
         ids = matches["match_id"].astype(int).tolist()
         select_idx = st.selectbox(
@@ -194,12 +197,13 @@ def render_dashboard(root: Path) -> None:
 
         # 3) Trigger pipeline
         if st.button("Update Dashboard", use_container_width=True):
-            with st.spinner(f"Load events for match_id={match_id} ..."):
+            with st.spinner(f"Load events for match_id={match_id} …"):
                 try:
                     fetch_events(match_id, force=True)
                 except StatsBombFetchError as exc:
                     st.error(
-                        "Unable to download match events. Please retry later."
+                        "Unable to download match events. "
+                        "Please retry later."
                     )
                     st.caption(str(exc))
                     st.stop()
@@ -211,41 +215,34 @@ def render_dashboard(root: Path) -> None:
                 extract_shot_data(match_id=match_id)
                 fetch_passes(match_id=match_id)
 
-                # Run preprocessing and training scripts and surface logs.
+                # Preprocess + Train
                 _run_py(root / "src" / "preprocess_xG.py")
                 _run_py(root / "src" / "train_xG_model.py")
 
             st.success("Pipeline updated.")
-            # Avoid clearing all app caches
             st.session_state["last_pipeline_mtime"] = time.time()
-            # Force a rerun so UI reflects new data (fallback)
             try:
-                if hasattr(st, "experimental_rerun"):
-                    st.experimental_rerun()
-                elif hasattr(st, "rerun"):
-                    st.rerun()
-                else:
-                    st.info("Dashboard updated; please refresh the page.")
-                    st.stop()
+                st.rerun()
             except Exception:
                 st.info("Dashboard updated; please refresh the page.")
                 st.stop()
 
-    # --------- TABS ---------
+    # ---------------- Tabs ----------------
     tabs = st.tabs(["Shot Map (xG)", "Passing Network", "Model", "Data"])
 
-    # ==== Tab 1: Shot Map (Plotly, fixed size) ====
+    # ==== Tab 1: Shot Map ====
     with tabs[0]:
         shots_csv = root / "data" / "processed_shots.csv"
-        # Provide mtime key to the cached loader to avoid global cache clearing
         df_shots, shot_issues = _load_shots_df(
-            root, max(
+            root,
+            max(
                 _file_mtime(shots_csv),
-                float(st.session_state.get("last_pipeline_mtime", 0.0))
-            )
+                float(st.session_state.get("last_pipeline_mtime", 0.0)),
+            ),
         )
         for issue in shot_issues:
             st.warning(issue)
+
         if df_shots.empty:
             st.info("No shots available yet. Please run the pipeline.")
         else:
@@ -260,7 +257,9 @@ def render_dashboard(root: Path) -> None:
 
             c1, c2, c3 = st.columns(3)
             team_choice = c1.selectbox(
-                "Team", team_options, key=f"sm_team_{match_id}"
+                "Team",
+                team_options,
+                key=f"sm_team_{match_id}",
             )
             outcome_choice = c2.selectbox(
                 "Outcome",
@@ -283,8 +282,8 @@ def render_dashboard(root: Path) -> None:
             if outcome_choice == "Goals" and "goal_scored" in dff.columns:
                 dff = dff[dff["goal_scored"] == 1]
             elif (
-                outcome_choice == "Other shots"
-                and "goal_scored" in dff.columns
+                outcome_choice == "Other shots" and
+                "goal_scored" in dff.columns
             ):
                 dff = dff[dff["goal_scored"] == 0]
             if "minute" in dff.columns:
@@ -299,29 +298,16 @@ def render_dashboard(root: Path) -> None:
                 msg = sample_size_warning(dff, threshold=8)
                 if msg:
                     st.info(msg)
-                # Let user choose compact / wide or keep persisted fig size
-                with st.expander("Display options", expanded=False):
-                    choice = st.radio(
-                        "Layout",
-                        ("Persisted", "Compact", "Wide"),
-                        index=0,
-                        key=f"sm_layout_{match_id}",
-                    )
-                    if choice == "Compact":
-                        st.session_state["fig_size"] = (700, 420)
-                    elif choice == "Wide":
-                        st.session_state["fig_size"] = (1100, 600)
+
                 fig = make_shot_map_plotly(
                     dff,
                     title="Shot Map (bubble = xG, red = goal)",
-                    fig_size=st.session_state["fig_size"],
+                    fig_size=FIG_SIZE,  # feste, optimierte Größe
                 )
                 st.plotly_chart(
-                    fig,
-                    use_container_width=False,
-                    theme="streamlit"
+                    fig, use_container_width=False, theme="streamlit"
                 )
-                # Optional: quick table for top shooters by xG
+
                 if {"player", "xG"}.issubset(dff.columns):
                     st.subheader("Top shooters by xG")
                     tmp = dff.copy()
@@ -343,16 +329,29 @@ def render_dashboard(root: Path) -> None:
                     table["xg"] = table["xg"].round(2)
                     st.dataframe(table, use_container_width=True)
 
-    # ==== Tab 2: Passing Network (Plotly, fixed size) ====
+    # ==== Tab 2: Passing Network ====
     with tabs[1]:
         passes_path = root / "data" / "passing_data.csv"
-        result = load_passes_csv(passes_path)
-        if result is None or result.frame.empty:
+        raw = load_passes_csv(passes_path)
+
+        # Unterstützt sowohl aktuelle Funktion (DataFrame/None)
+        # als auch eine mögliche Rückgabe-Struktur mit .frame/.issues
+        if raw is None:
+            df_pass = pd.DataFrame()
+            pass_issues: list[str] = []
+        elif isinstance(raw, pd.DataFrame):
+            df_pass = raw
+            pass_issues = []
+        else:
+            df_pass = getattr(raw, "frame", pd.DataFrame())
+            pass_issues = list(getattr(raw, "issues", []))
+
+        for issue in pass_issues:
+            st.warning(issue)
+
+        if df_pass.empty:
             st.info("No passing data yet. Please run the pipeline.")
         else:
-            for issue in result.issues:
-                st.warning(issue)
-            df_pass = result.frame.copy()
             c1, c2, c3 = st.columns(3)
             min_passes = int(
                 c1.slider(
@@ -392,6 +391,7 @@ def render_dashboard(root: Path) -> None:
                 msg = sample_size_warning(dfp, threshold=12)
                 if msg:
                     st.info(msg)
+
                 nodes, edges_tbl = build_network_tables(
                     dfp, min_passes=min_passes
                 )
@@ -399,13 +399,12 @@ def render_dashboard(root: Path) -> None:
                     nodes,
                     edges_tbl,
                     title=f"Passing Network (≥{min_passes} passes)",
-                    fig_size=st.session_state["fig_size"],
+                    fig_size=FIG_SIZE,  # feste, optimierte Größe
                 )
                 st.plotly_chart(
                     fig, use_container_width=False, theme="streamlit"
                 )
 
-                # Quick table for top edges
                 st.subheader("Most frequent passing links")
                 edge_table = (
                     dfp.groupby(["passer", "receiver"])
