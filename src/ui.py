@@ -305,10 +305,11 @@ def render_dashboard(root: Path) -> None:
                 )
                 st.plotly_chart(
                     fig,
-                    width="content",   # was: use_container_width=False
-                    theme="streamlit",
-                    )
-
+                    width="content",  # or "stretch" if you want full-width
+                    config={"displayModeBar": True,
+                            "scrollZoom": True,
+                            "displaylogo": False},
+                )
                 if {"player", "xG"}.issubset(dff.columns):
                     st.subheader("Top shooters by xG")
                     tmp = dff.copy()
@@ -404,8 +405,12 @@ def render_dashboard(root: Path) -> None:
                 )
                 st.plotly_chart(
                     fig,
-                    width="content",   # was: use_container_width=False
-                    theme="streamlit",
+                    width="content",  # or "stretch"
+                    config={
+                        "displayModeBar": True,
+                        "scrollZoom": True,
+                        "displaylogo": False
+                    },
                 )
                 st.subheader("Most frequent passing links")
                 edge_table = (
