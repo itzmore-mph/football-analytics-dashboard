@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 shot_distance,shot_angle,goal_scored,x,y,team,player,minute,second,under_pressure,is_penalty,is_header,body_part,technique,shot_type,distance_squared,angle_squared,distance_angle_interaction,xG,xg_bucket
 7.0292247083159936,0.9124993890155318,1,114.6,35.5,Hertha Berlin,Vedad Ibišević,3.0,0.0,0,0,0,Right Foot,Half Volley,Open Play,49.41000000000007,0.8326551349537189,6.414163251591225,1.0,0.30+
 13.781872151489436,0.562259998546218,0,106.3,38.5,Hannover 96,Uffe Manich Bech,5.0,10.0,1,0,0,Right Foot,Normal,Open Play,189.94000000000005,0.31613630596519304,7.7489954158606125,0.0,0-0.05
@@ -23,3 +24,33 @@ shot_distance,shot_angle,goal_scored,x,y,team,player,minute,second,under_pressur
 10.463746938836014,0.5075978642622163,0,113.5,48.2,Hertha Berlin,Vedad Ibišević,83.0,2.0,0,0,1,Head,Normal,Open Play,109.49000000000005,0.2576555918035634,5.3113755983334645,0.0,0-0.05
 9.935793878699382,0.5542409050050057,0,113.6,47.6,Hertha Berlin,Vedad Ibišević,89.0,37.0,0,0,1,Head,Normal,Open Play,98.72000000000011,0.3071829807807677,5.506823391273541,0.0,0-0.05
 24.539152389599764,0.2292756162357599,0,102.9,57.6,Hannover 96,Artur Sobiech,90.0,44.0,1,0,0,Right Foot,Normal,Open Play,602.1699999999998,0.052567308200287446,5.626229286028706,0.0,0-0.05
+=======
+match_id,player,team,x,y,shot_distance,shot_angle,goal_scored,body_part,technique,shot_type,is_penalty,is_header,under_pressure,minute,second
+3895302,Leonardo Bittencourt,Werder Bremen,100.4,35.1,20.20321756552653,0.3803568904243888,0,Right Foot,Normal,Open Play,0,0,0,6,48
+3895302,Piero Martín Hincapié Reyna,Bayer Leverkusen,114.6,33.5,8.450443775329202,0.662204086578038,0,Left Foot,Normal,Open Play,0,0,1,7,40
+3895302,Julián Malatini,Werder Bremen,106.2,55.8,20.97808380191098,0.254675489901579,0,Left Foot,Normal,Open Play,0,0,0,11,8
+3895302,Jonathan Tah,Bayer Leverkusen,113.9,47.4,9.590099061010784,0.5709848001479605,0,Head,Normal,Open Play,0,1,0,13,16
+3895302,Granit Xhaka,Bayer Leverkusen,89.2,42.5,30.9012944712677,0.2566499139801903,0,Left Foot,Normal,Open Play,0,0,1,16,0
+3895302,Jonathan Tah,Bayer Leverkusen,110.2,32.6,12.280065146406995,0.5267819823808946,0,Head,Normal,Open Play,0,1,1,16,31
+3895302,Nick Woltemade,Werder Bremen,105.4,45.1,15.465122049308238,0.4821666409184634,0,Right Foot,Normal,Open Play,0,0,1,18,28
+3895302,Victor Okoh Boniface,Bayer Leverkusen,108.0,40.0,12.0,0.6435011087932844,1,Right Foot,Normal,Penalty,1,0,0,24,27
+3895302,Granit Xhaka,Bayer Leverkusen,101.5,47.5,19.96246477767713,0.3691869602015418,0,Left Foot,Normal,Open Play,0,0,0,27,46
+3895302,Jonathan Tah,Bayer Leverkusen,116.3,46.0,7.049113419430845,0.7208647341856302,0,Head,Normal,Open Play,0,1,1,28,21
+3895302,Victor Okoh Boniface,Bayer Leverkusen,116.3,43.3,4.957822102496216,1.288663561228514,0,Right Foot,Volley,Open Play,0,0,0,28,23
+3895302,Jonas Hofmann,Bayer Leverkusen,109.4,44.9,11.677756633874498,0.6137360259598656,0,Right Foot,Normal,Open Play,0,0,0,34,51
+3895302,Amine Adli,Bayer Leverkusen,113.1,27.5,14.27795503564849,0.2857920473225966,0,Left Foot,Normal,Open Play,0,0,1,37,40
+3895302,Edmond Fayçal Tapsoba,Bayer Leverkusen,110.1,41.6,10.028459502834924,0.752620019206357,0,Head,Normal,Open Play,0,1,0,43,36
+3895302,Mitchell Weiser,Werder Bremen,115.9,40.1,4.10121933088197,1.5458015331759778,0,Head,Normal,Open Play,0,1,0,45,26
+3895302,Leonardo Bittencourt,Werder Bremen,97.5,40.8,22.51421773013666,0.3514573638108738,0,Left Foot,Normal,Open Play,0,0,1,50,35
+3895302,Florian Wirtz,Bayer Leverkusen,93.8,34.8,26.711046404062877,0.2919249937176837,0,Right Foot,Normal,Open Play,0,0,1,58,10
+3895302,Granit Xhaka,Bayer Leverkusen,93.0,39.1,27.01499583564654,0.2938418094133846,1,Left Foot,Normal,Open Play,0,0,0,59,18
+3895302,Florian Wirtz,Bayer Leverkusen,106.3,29.6,17.200290695217916,0.3732773640500932,0,Right Foot,Normal,Open Play,0,0,0,64,10
+3895302,Florian Wirtz,Bayer Leverkusen,93.5,40.1,26.500188678573597,0.29962080374203,1,Right Foot,Normal,Open Play,0,0,0,67,25
+3895302,Patrik Schick,Bayer Leverkusen,112.5,29.6,12.822246293064254,0.3841952415353136,0,Left Foot,Half Volley,Open Play,0,0,0,70,17
+3895302,Jeremie Frimpong,Bayer Leverkusen,108.0,51.1,16.346559270990333,0.3650247233360036,0,Right Foot,Normal,Open Play,0,0,0,71,31
+3895302,Olivier Deman,Werder Bremen,108.1,27.2,17.47712791050063,0.3177549345413262,0,Left Foot,Half Volley,Open Play,0,0,0,74,42
+3895302,Romano Schmid,Werder Bremen,98.2,42.1,21.900913222968576,0.3597748283301903,0,Right Foot,Half Volley,Open Play,0,0,0,74,45
+3895302,Exequiel Alejandro Palacios,Bayer Leverkusen,101.6,43.3,18.69358178627093,0.4157172662913777,0,Right Foot,Normal,Open Play,0,0,0,80,22
+3895302,Florian Wirtz,Bayer Leverkusen,103.6,35.0,17.14526173611824,0.4410062347740051,1,Right Foot,Normal,Open Play,0,0,0,82,29
+3895302,Florian Wirtz,Bayer Leverkusen,106.4,48.8,16.198765385053264,0.4158117890246287,1,Right Foot,Normal,Open Play,0,0,0,89,25
+>>>>>>> parent of 3885182 (debugging)

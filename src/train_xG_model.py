@@ -203,6 +203,7 @@ df["xg_bucket"] = pd.cut(
     labels=["0-0.05", "0.05-0.10", "0.10-0.20", "0.20-0.30", "0.30+"],
     include_lowest=True,
 )
+<<<<<<< HEAD
 
 # IMPORTANT: keep the chain intact
 (
@@ -210,6 +211,13 @@ df["xg_bucket"] = pd.cut(
     .agg(["mean", "count"])
     .reset_index()
     .to_csv(XG_BUCKETS_CSV, index=False)
+=======
+df.groupby(
+    "xg_bucket"
+    )
+["goal_scored"].agg(["mean", "count"]).reset_index().to_csv(
+    XG_BUCKETS_CSV, index=False
+>>>>>>> parent of 3885182 (debugging)
 )
 
 # ---------- Save ----------
