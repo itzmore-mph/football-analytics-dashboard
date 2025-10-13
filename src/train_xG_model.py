@@ -19,7 +19,7 @@ ROOT = Path(__file__).resolve().parents[1]
 DATA_PATH = ROOT / "data" / "processed_shots.csv"
 MODEL_DIR = ROOT / "models"
 MODEL_DIR.mkdir(parents=True, exist_ok=True)
-MODEL_PATH = MODEL_DIR / "xgboost_xg_model_calibrated.joblib"
+MODEL_PATH = MODEL_DIR / "xgb_xg_calibrated.joblib"
 METRIC_PATH = MODEL_DIR / "xgboost_metrics.txt"
 RELIABILITY_PATH = MODEL_DIR / "xgboost_reliability.csv"
 FEATURES_PATH = MODEL_DIR / "features.txt"
@@ -163,7 +163,7 @@ except ValueError:
 brier_cal = brier_score_loss(y_test, proba_cal)
 
 # ---------- xG for all ----------
-df["xG"] = calibrator.predict_proba(X_all_t)[:, 1]
+df["xg"] = calibrator.predict_proba(X_all_t)[:, 1]
 
 # ---------- Reliability table ----------
 bins = np.linspace(0, 1, 11)
@@ -198,7 +198,7 @@ plt.close()
 
 # ---------- xG buckets ----------
 df["xg_bucket"] = pd.cut(
-    df["xG"],
+    df["xg"],
     bins=[0, 0.05, 0.10, 0.20, 0.30, 1.0],
     labels=["0-0.05", "0.05-0.10", "0.10-0.20", "0.20-0.30", "0.30+"],
     include_lowest=True,
@@ -207,9 +207,9 @@ df["xg_bucket"] = pd.cut(
 # IMPORTANT: keep the chain intact
 (
     df.groupby("xg_bucket", observed=False)["goal_scored"]
-      .agg(["mean", "count"])
-      .reset_index()
-      .to_csv(XG_BUCKETS_CSV, index=False)
+    .agg(["mean", "count"])
+    .reset_index()
+    .to_csv(XG_BUCKETS_CSV, index=False)
 )
 
 # ---------- Save ----------

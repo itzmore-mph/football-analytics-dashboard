@@ -18,15 +18,17 @@ football-analytics-dashboard/
 │   ├── fetch_passing_data.py     # Extract passing data from raw JSON
 │   ├── fetch_shots_data.py       # Extract shot data from raw JSON
 │   ├── fetch_statsbomb.py        # Fetch match data from StatsBomb
-│   ├── open_data.py              # Helpers for working with StatsBomb open data
-│   ├── passing_network.py        # Network analysis helpers
 │   ├── preprocess_xG.py          # Clean and process shot data
 │   ├── train_xG_model.py         # Train xG model using XGBoost
 │   ├── ui.py                     # Streamlit entry point
 │   └── validation.py             # Data validation utilities
 ├── tests/                        # Pytest suite for validation & plotting
 │   ├── conftest.py
+│   ├── test_entrypoint_import.py
+│   ├── test_load_shots_smoke.py
 │   ├── test_plots.py
+│   ├── test_session_state_figsize.py
+│   ├── test_smoke_validation_import.py
 │   ├── test_ui_helpers.py
 │   └── test_validation.py
 ├── streamlit_app.py              # Streamlit launcher (imports src.ui)

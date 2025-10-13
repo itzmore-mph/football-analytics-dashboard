@@ -548,7 +548,7 @@ def run():
     ]:
         statuses.append(f"{name}: {'present' if exists else 'missing'}")
 
-    st.caption("Data paths — ".join(statuses))
+    st.caption("Data paths — " + "  •  ".join(statuses))
 
 
 if __name__ == "__main__":

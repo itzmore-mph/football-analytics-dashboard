@@ -44,6 +44,12 @@ def main():
     existing = [c for c in keep_cols if c in df.columns]
     df = df[existing].copy()
 
+    rename_map = {
+        "goal_scored": "is_goal",
+        "xG": "xg",
+    }
+    df = df.rename(columns=rename_map)
+
     df.to_csv(OUT_CSV, index=False)
     print(f"Wrote processed shots: {OUT_CSV}")
 
