@@ -19,11 +19,7 @@ def competitions() -> pd.DataFrame:
 
 def seasons_for(comp_id: int) -> pd.DataFrame:
     df = competitions()
-    return df[df["competition_id"] == comp_id][[
-        "competition_id",
-        "season_id",
-        "season_name"]
-        ]
+    return df[df["competition_id"] == comp_id][["competition_id", "season_id", "season_name"]]
 
 
 def matches(comp_id: int, season_id: int) -> pd.DataFrame:
@@ -47,12 +43,10 @@ def collect_demo_matches(plan: DemoPlan | None = None) -> list[int]:
     if plan is None:
         plan = DemoPlan()
     m_ids: list[int] = []
-    for comp in plan.competitions[:2]:
+    for comp in plan.competitions:
         comp_df = seasons_for(comp)
         for _, row in comp_df.head(plan.seasons_per_comp).iterrows():
-            m = matches(
-                int(row.competition_id), int(row.season_id)
-            ).head(plan.matches_per_season)
+            m = matches(int(row.competition_id), int(row.season_id)).head(plan.matches_per_season)
             m_ids.extend(m["match_id"].astype(int).tolist())
     return m_ids[: settings.demo_matches]
 

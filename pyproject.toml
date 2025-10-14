@@ -50,3 +50,7 @@ line_length = 100
 [tool.ruff]
 line-length = 100
 lint.select = ["E", "F", "I", "B", "UP"]
+
+[tool.flake8]
+max-line-length = 100
+extend-ignore = ["E203"]

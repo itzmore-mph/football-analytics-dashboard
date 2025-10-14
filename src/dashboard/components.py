@@ -1,30 +1,26 @@
-from __future__ import annotations
-
+# src/dashboard/components.py
 import streamlit as st
-
-
-def metric_badge(
-    label: str,
-    value: float | int | str,
-    help_text: str | None = None
-):
-    col = st.container(border=True)
-    with col:
-        st.markdown(f"### {label}")
-        st.markdown(
-            f"<div style='font-size: 28px; font-weight:700'>{value}</div>",
-            unsafe_allow_html=True
-        )
-        if help_text:
-            st.caption(help_text)
 
 
 def sidebar_filters():
     st.sidebar.header("Filters")
+
     min_minute, max_minute = st.sidebar.slider(
-        "Minute range", 0, 120, (0, 120)
+        "Minute range",
+        min_value=0,
+        max_value=120,
+        value=(0, 120),
+        key="minute_range",
     )
-    pass_threshold = st.sidebar.slider("Pass edge threshold", 1, 10, 3)
+
+    pass_threshold = st.sidebar.slider(
+        "Pass edge threshold",
+        min_value=1,
+        max_value=10,
+        value=3,
+        key="pass_threshold",
+    )
+
     return {
         "minute_range": (min_minute, max_minute),
         "pass_threshold": pass_threshold,

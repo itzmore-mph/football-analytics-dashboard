@@ -1,0 +1,63 @@
+[
+  {
+    "type": {"name": "Pass"},
+    "team": {"name": "Sample FC"},
+    "player": {"name": "Player D"},
+    "minute": 2,
+    "location": [25, 35],
+    "pass": {
+      "end_location": [45, 30],
+      "recipient": {"name": "Player E"}
+    }
+  },
+  {
+    "type": {"name": "Pass"},
+    "team": {"name": "Example United"},
+    "player": {"name": "Player AA"},
+    "minute": 4,
+    "location": [55, 40],
+    "pass": {
+      "end_location": [75, 42],
+      "recipient": {"name": "Player BB"}
+    }
+  },
+  {
+    "type": {"name": "Pass"},
+    "team": {"name": "Example United"},
+    "player": {"name": "Player BB"},
+    "minute": 5,
+    "location": [75, 42],
+    "pass": {
+      "end_location": [90, 40],
+      "recipient": {"name": "Player CC"}
+    }
+  },
+  {
+    "type": {"name": "Shot"},
+    "team": {"name": "Sample FC"},
+    "player": {"name": "Player F"},
+    "minute": 33,
+    "location": [102, 36],
+    "shot": {
+      "outcome": {"name": "Off T"},
+      "type": {"name": "Open Play"}
+    },
+    "body_part": {"name": "Head"},
+    "play_pattern": {"name": "Corner"},
+    "under_pressure": false
+  },
+  {
+    "type": {"name": "Shot"},
+    "team": {"name": "Example United"},
+    "player": {"name": "Player CC"},
+    "minute": 70,
+    "location": [110, 40],
+    "shot": {
+      "outcome": {"name": "Goal"},
+      "type": {"name": "Penalty"}
+    },
+    "body_part": {"name": "Right Foot"},
+    "play_pattern": {"name": "Penalty"},
+    "under_pressure": false
+  }
+]

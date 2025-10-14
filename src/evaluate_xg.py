@@ -3,6 +3,9 @@ from __future__ import annotations
 import json
 
 import joblib
+import matplotlib
+
+matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import pandas as pd
 from sklearn.calibration import calibration_curve
@@ -12,6 +15,14 @@ from .features_xg import FEATURE_COLUMNS, TARGET_COLUMN
 
 
 def evaluate_and_plot(n_bins: int = 10) -> dict:
+    if not settings.processed_shots_csv.exists():
+        msg = "Processed shots CSV not found. Run `python -m src.cli preprocess`."
+        raise FileNotFoundError(msg)
+
+    if not settings.model_path.exists():
+        msg = "Model file not found. Run `python -m src.cli train`."
+        raise FileNotFoundError(msg)
+
     df = pd.read_csv(settings.processed_shots_csv)
     model = joblib.load(settings.model_path)
     proba = model.predict_proba(df[FEATURE_COLUMNS].values)[:, 1]
@@ -27,6 +38,7 @@ def evaluate_and_plot(n_bins: int = 10) -> dict:
     settings.plots_dir.mkdir(parents=True, exist_ok=True)
     out_path = settings.plots_dir / "calibration.png"
     fig.savefig(out_path, bbox_inches="tight", dpi=150)
+    plt.close(fig)
 
     report = {
         "n": int(len(df)),
@@ -34,5 +46,5 @@ def evaluate_and_plot(n_bins: int = 10) -> dict:
         "plot": str(out_path),
     }
     evaluation_path = settings.models_dir / "evaluation.json"
-    evaluation_path.write_text(json.dumps(report, indent=2))
+    evaluation_path.write_text(json.dumps(report, indent=2), encoding="utf-8")
     return report

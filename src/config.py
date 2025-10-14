@@ -11,6 +11,7 @@ class Settings(BaseModel):
     data_dir: Path = root / "data"
     models_dir: Path = root / "models"
     plots_dir: Path = models_dir / "plots"
+    sample_data_dir: Path = root / "sample_data"
     demo_matches: int = 4
     cache_seconds: int = 3600
 
