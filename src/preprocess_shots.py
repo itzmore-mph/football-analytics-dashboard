@@ -1,39 +1,39 @@
 from __future__ import annotations
+
+from collections.abc import Iterable
+
+import numpy as np
 import pandas as pd
-from typing import Iterable
 
 from .config import settings
+from .features_xg import build_basic_features
 from .open_data import events
 from .utils_io import save_csv
-from .features_xg import build_basic_features, FEATURE_COLUMNS, TARGET_COLUMN
 
 
 def _extract_shots(ev: pd.DataFrame) -> pd.DataFrame:
     shots = ev[ev["type.name"] == "Shot"].copy()
-    # outcome flag
-    shots[TARGET_COLUMN] = (
-        shots["shot.outcome.name"]
-        .fillna("")
-        .str.lower() == "goal"
-    ).astype(int)
-    # normalize locations
-    loc = shots["location"].apply(
-        lambda v: v if isinstance(v, list) else [None, None]
-    )
-    shots["location.x"] = loc.apply(
-        lambda location: float(location[0])
-        if location and location[0] is not None
-        else None
-    )
-    shots["location.y"] = loc.apply(
-        lambda location: float(location[1])
-        if location and location[1] is not None
-        else None
-    )
-    shots = shots.dropna(subset=[
-        "location.x",
-        "location.y"]).reset_index(drop=True)
-    # keep useful columns
+
+    # Ensure optional columns exist (StatsBomb sometimes omits them)
+    optional_defaults: dict[str, object] = {
+        "body_part.name": "Unknown",
+        "play_pattern.name": "Unknown",
+        "shot.type.name": "Unknown",
+        "shot.outcome.name": "Unknown",
+        "under_pressure": False,
+    }
+    for col, default in optional_defaults.items():
+        if col not in shots.columns:
+            shots[col] = default
+
+    # Robust location extraction -> location.x / location.y
+    if "location" not in shots.columns:
+        shots["location"] = None
+    loc = shots["location"].apply(lambda v: v if isinstance(v, list) else [np.nan, np.nan])
+    shots["location.x"] = loc.apply(lambda xy: float(xy[0]) if xy and xy[0] is not None else np.nan)
+    shots["location.y"] = loc.apply(lambda xy: float(xy[1]) if xy and xy[1] is not None else np.nan)
+
+    # Keep a stable set of columns for feature builder
     keep = [
         "match_id",
         "team.name",
@@ -46,8 +46,14 @@ def _extract_shots(ev: pd.DataFrame) -> pd.DataFrame:
         "shot.type.name",
         "location.x",
         "location.y",
-        ]
-    shots = shots[keep]
+    ]
+    # Use reindex to avoid KeyErrors; missing columns will be filled
+    shots = shots.reindex(columns=keep)
+
+    # Basic sanity: drop rows with completely missing coordinates
+    shots = shots.dropna(subset=["location.x", "location.y"], how="any")
+
+    # Downstream feature engineering
     shots = build_basic_features(shots)
     return shots
 

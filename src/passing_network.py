@@ -1,9 +1,9 @@
 from __future__ import annotations
+
+from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import Iterable
 
 import networkx as nx
-import numpy as pd
 import pandas as pd
 
 from .config import settings
@@ -20,31 +20,19 @@ class NetworkResult:
 def _extract_passes(ev: pd.DataFrame) -> pd.DataFrame:
     df = ev[ev["type.name"] == "Pass"].copy()
     # locations
-    loc = df["location"].apply(
-        lambda v: v if isinstance(v, list) else [None, None]
-    )
+    loc = df["location"].apply(lambda v: v if isinstance(v, list) else [None, None])
     df["x"] = loc.apply(
-        lambda location: float(location[0])
-        if location and location[0] is not None
-        else None
+        lambda location: float(location[0]) if location and location[0] is not None else None
     )
     df["y"] = loc.apply(
-        lambda location: float(location[1])
-        if location and location[1] is not None
-        else None
+        lambda location: float(location[1]) if location and location[1] is not None else None
     )
-    end = df["pass.end_location"].apply(
-        lambda v: v if isinstance(v, list) else [None, None]
-    )
+    end = df["pass.end_location"].apply(lambda v: v if isinstance(v, list) else [None, None])
     df["x_end"] = end.apply(
-        lambda location: float(location[0])
-        if location and location[0] is not None
-        else None
+        lambda location: float(location[0]) if location and location[0] is not None else None
     )
     df["y_end"] = end.apply(
-        lambda location: float(location[1])
-        if location and location[1] is not None
-        else None
+        lambda location: float(location[1]) if location and location[1] is not None else None
     )
     # receiver
     df["receiver"] = df["pass.recipient.name"].fillna("")
@@ -52,30 +40,31 @@ def _extract_passes(ev: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-def build_team_network(
-    match_id: int, team_name: str, min_edge: int = 2
-) -> NetworkResult:
+def build_team_network(match_id: int, team_name: str, min_edge: int = 2) -> NetworkResult:
     ev = events(match_id)
     df = _extract_passes(ev)
     df = df[df["team.name"] == team_name].copy()
-    # nodes: average positions per player
-    # (use start locations of their passes & receptions)
-    starts = df.groupby("player.name").agg(
-        x=("x", "mean"),
-        y=("y", "mean"),
-        touches=("player.name", "count")
-    ).reset_index()
-    recvs = df.groupby("receiver").agg(
-        x_recv=("x_end", "mean"),
-        y_recv=("y_end", "mean"),
-        received=("receiver", "count")
-    ).reset_index()
-    nodes = starts.merge(
-        recvs,
-        left_on="player.name",
-        right_on="receiver",
-        how="outer"
+
+    # nodes: average positions per player (passes & receptions)
+    starts = (
+        df.groupby("player.name")
+        .agg(
+            x=("x", "mean"),
+            y=("y", "mean"),
+            touches=("player.name", "count"),
+        )
+        .reset_index()
     )
+    recvs = (
+        df.groupby("receiver")
+        .agg(
+            x_recv=("x_end", "mean"),
+            y_recv=("y_end", "mean"),
+            received=("receiver", "count"),
+        )
+        .reset_index()
+    )
+    nodes = starts.merge(recvs, left_on="player.name", right_on="receiver", how="outer")
     nodes["x_mean"] = nodes[["x", "x_recv"]].mean(axis=1)
     nodes["y_mean"] = nodes[["y", "y_recv"]].mean(axis=1)
     nodes["touches"] = nodes[["touches", "received"]].fillna(0).sum(axis=1)
@@ -83,15 +72,24 @@ def build_team_network(
     nodes = nodes[["player", "x_mean", "y_mean", "touches"]].fillna(0)
 
     # edges: completed passes player -> receiver
-    # completed when outcome is NaN in SB data
+    # (completed when outcome is NaN in SB data)
     comp = df[df["pass.outcome.name"].isna()].copy()
-    edges = comp.groupby(["player.name", "receiver"]) \
-                .size() \
-                .reset_index(name="count")
-    edges = edges[edges["count"] >= max(1, int(min_edge))]
-    edges = edges.rename(
-        columns={"player.name": "source", "receiver": "target"}
+    edges = (
+        comp.groupby(["player.name", "receiver"])
+        .size()
+        .reset_index(name="count")
+        .rename(columns={"player.name": "source", "receiver": "target"})
     )
+    edges = edges[edges["count"] >= max(1, int(min_edge))].reset_index(drop=True)
+
+    # OPTIONAL graph metrics: degree centrality
+    G = nx.DiGraph()
+    for _, n in nodes.iterrows():
+        G.add_node(n["player"])
+    for _, e in edges.iterrows():
+        G.add_edge(e["source"], e["target"], weight=int(e["count"]))
+    deg = nx.degree_centrality(G)
+    nodes["centrality"] = nodes["player"].map(deg).fillna(0.0)
 
     return NetworkResult(nodes=nodes, edges=edges)
 

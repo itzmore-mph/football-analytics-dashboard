@@ -1,17 +1,32 @@
 from __future__ import annotations
 import pandas as pd
 import joblib
-import streamlit as st
 from mplsoccer import Pitch
+
+# Safe cache decorators: no-op if Streamlit runtime isn't present.
+try:
+    import streamlit as st  # type: ignore
+    cache_data = st.cache_data
+    cache_resource = st.cache_resource
+except Exception:  # importing outside runtime or Streamlit missing
+    def cache_data(*_a, **_k):
+        def _wrap(f):  # no-op decorator
+            return f
+        return _wrap
+
+    def cache_resource(*_a, **_k):
+        def _wrap(f):
+            return f
+        return _wrap
 
 from ..config import settings
 from ..features_xg import FEATURE_COLUMNS
-from .theming import set_theme
 from .components import metric_badge, sidebar_filters
 from .plots import cumulative_xg_plot
+from .theming import set_theme
 
 
-@st.cache_data(show_spinner=False)
+@cache_data(show_spinner=False)
 def load_data() -> tuple[pd.DataFrame, pd.DataFrame]:
     shots = (
         pd.read_csv(settings.processed_shots_csv)
@@ -26,7 +41,7 @@ def load_data() -> tuple[pd.DataFrame, pd.DataFrame]:
     return shots, passes
 
 
-@st.cache_resource(show_spinner=False)
+@cache_resource(show_spinner=False)
 def load_model():
     if settings.model_path.exists():
         return joblib.load(settings.model_path)

@@ -1,15 +1,12 @@
 from __future__ import annotations
-from dataclasses import dataclass
-from typing import Iterable, List
 
+from dataclasses import dataclass
 
 import pandas as pd
 from tqdm import tqdm
 
-
 from .config import settings
 from .utils_io import read_remote_json
-
 
 RAW_BASE = "https://raw.githubusercontent.com/statsbomb/open-data/master/data"
 
@@ -46,7 +43,9 @@ class DemoPlan:
     matches_per_season: int = 2
 
 
-def collect_demo_matches(plan: DemoPlan = DemoPlan()) -> list[int]:
+def collect_demo_matches(plan: DemoPlan | None = None) -> list[int]:
+    if plan is None:
+        plan = DemoPlan()
     m_ids: list[int] = []
     for comp in plan.competitions[:2]:
         comp_df = seasons_for(comp)

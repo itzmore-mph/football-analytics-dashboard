@@ -1,6 +1,8 @@
 from __future__ import annotations
+
 import math
-from src.features_xg import shot_distance, shot_angle
+
+from src.features_xg import shot_angle, shot_distance
 
 
 def test_shot_distance_center():

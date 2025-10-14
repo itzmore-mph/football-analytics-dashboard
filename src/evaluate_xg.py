@@ -1,10 +1,10 @@
 from __future__ import annotations
-import json
-import numpy as np
-import pandas as pd
-import matplotlib.pyplot as plt
-import joblib
 
+import json
+
+import joblib
+import matplotlib.pyplot as plt
+import pandas as pd
 from sklearn.calibration import calibration_curve
 
 from .config import settings

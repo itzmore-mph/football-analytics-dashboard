@@ -1,5 +1,7 @@
 from __future__ import annotations
+
 import pandas as pd
+
 from src.passing_network import NetworkResult
 
 

@@ -1,12 +1,12 @@
 from __future__ import annotations
-import json
-from os import path
-from pathlib import Path
-from typing import Any, Iterable
 
+import json
+from collections.abc import Iterable
+from functools import lru_cache
+from pathlib import Path
+from typing import Any
 
 import pandas as pd
-from functools import lru_cache
 
 
 def save_csv(df: pd.DataFrame, path: Path) -> None:
@@ -15,7 +15,7 @@ def save_csv(df: pd.DataFrame, path: Path) -> None:
 
 
 def read_json(path: Path | str) -> Any:
-    with open(path, "r", encoding="utf-8") as f:
+    with open(path, encoding="utf-8") as f:
         return json.load(f)
 
 

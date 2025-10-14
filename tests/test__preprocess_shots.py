@@ -1,8 +1,9 @@
 from __future__ import annotations
+
 import pandas as pd
+
 from src.features_xg import (
     FEATURE_COLUMNS,
-    TARGET_COLUMN,
     build_basic_features,
 )
 
