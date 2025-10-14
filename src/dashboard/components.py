@@ -1,9 +1,6 @@
-# src/dashboard/components.py
 from __future__ import annotations
-import streamlit as st
 from typing import Any
-
-__all__ = ["sidebar_filters", "metric_badge"]  # helps explicit export
+import streamlit as st
 
 
 def sidebar_filters() -> dict:
@@ -25,7 +22,5 @@ def metric_badge(
     value: Any,
     delta: Any | None = None,
     help: str | None = None,
-    key: str | None = None,
 ) -> None:
-    """Thin wrapper so app.py can call metric_badge()."""
-    st.metric(label=label, value=value, delta=delta, help=help, key=key)
+    st.metric(label=label, value=value, delta=delta, help=help)
