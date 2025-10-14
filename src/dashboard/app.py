@@ -53,12 +53,18 @@ def _build_demo_artifacts() -> dict:
     """
     One-time builder for a tiny demo dataset on Streamlit Cloud:
     fetch -> passing CSV -> shots CSV -> train model.
+    Cached as a resource so it runs only when you click the button.
     """
-    # 🔁 absolute imports here too
-    from src.open_data import collect_demo_matches
-    from src.passing_network import build_and_save_passing_events
-    from src.preprocess_shots import build_processed_shots
-    from src.train_xg_model import train
+    try:
+        from src.open_data import collect_demo_matches
+        from src.passing_network import build_and_save_passing_events
+        from src.preprocess_shots import build_processed_shots
+        from src.train_xg_model import train
+    except ModuleNotFoundError:
+        from ..open_data import collect_demo_matches
+        from ..passing_network import build_and_save_passing_events
+        from ..preprocess_shots import build_processed_shots
+        from ..train_xg_model import train
 
     mids = collect_demo_matches()
     build_and_save_passing_events(mids)
