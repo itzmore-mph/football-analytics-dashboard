@@ -2,6 +2,38 @@
 
 [![Streamlit](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://football-analytics-dashboard.streamlit.app/)
 
+End‑to‑end xG modeling + Passing Networks + Match‑day Streamlit dashboard using **StatsBomb Open Data**.
+
+## Quickstart (Demo in <10 minutes)
+
+```bash
+git clone <your-repo-url>
+cd football-analytics-dashboard
+python -m venv .venv && source .venv/bin/activate # Windows: .venv\Scripts\activate
+pip install -U pip
+pip install -e .[dev]
+pre-commit install
+
+# End‑to‑end demo (small sample)
+python -m src.cli fetch --demo
+python -m src.cli preprocess
+python -m src.cli train --model xgb --calibration isotonic
+python -m src.cli evaluate
+streamlit run streamlit_app.py
+```
+
+## Full Data
+
+```bash
+python -m src.cli fetch --full
+```
+
+## Features
+
+- **xG model**: LR baseline + XGBoost, calibrated (isotonic/Platt). Train/val split by match to avoid leakage. Metrics: ROC‑AUC, Brier, LogLoss. Reliability plot saved in `models/plots/`.
+- **Passing networks**: Team‑match nodes from average locations; edges weighted by completed passes with threshold in UI.
+- **Dashboard**: Match Overview (cumulative xG timeline), Shot Map & xG (interactive pitch), Passing Network (interactive network over pitch). Plotly uses `width="stretch"` (no deprecated `use_container_width`).
+
 ## Data Source
 
 StatsBomb Open Data © StatsBomb – see their license and attribution. Data is fetched directly from GitHub raw files.
