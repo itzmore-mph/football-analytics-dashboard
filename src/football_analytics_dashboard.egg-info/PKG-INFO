@@ -1,9 +1,0 @@
-Metadata-Version: 2.4
-Name: football_analytics_dashboard
-Version: 0.1.0
-Summary: Streamlit dashboard for football analytics
-Author: Moritz Philipp Haaf
-Requires-Python: >=3.11
-Dynamic: author
-Dynamic: requires-python
-Dynamic: summary

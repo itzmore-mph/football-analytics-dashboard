@@ -1,0 +1,6 @@
+# requirements-dev.txt
+pytest~=8.3
+pytest-cov~=5.0
+ruff~=0.6
+black~=24.8
+isort~=5.13

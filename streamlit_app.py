@@ -1,5 +1,6 @@
-# streamlit_app.py
-from src.ui import run
+from __future__ import annotations
+from src.dashboard.app import run
+
 
 if __name__ == "__main__":
     run()
