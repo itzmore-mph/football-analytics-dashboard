@@ -5,19 +5,22 @@ import plotly.graph_objects as go
 
 
 def cumulative_xg_plot(df: pd.DataFrame) -> go.Figure:
+    s = (
+        df.sort_values("minute").assign(cum_xg=df["xg"].cumsum())
+    )
     fig = go.Figure()
-    for team, sub in df.groupby("team.name"):
-        ordered = sub.sort_values("minute").copy()
-        ordered["cum_xg"] = ordered["xg"].cumsum()
-        fig.add_trace(
-            go.Scatter(
-                x=ordered["minute"],
-                y=ordered["cum_xg"],
-                mode="lines",
-                name=team,
-            )
-        )
-    fig.update_layout(margin=dict(l=10, r=10, t=10, b=10))
-    fig.update_layout(legend_title_text="Team")
-    fig.update_layout(width="stretch")
+    fig.add_scatter(
+        x=s["minute"],
+        y=s["cum_xg"],
+        mode="lines+markers",
+        name="Cumulative xG",
+    )
+    fig.update_layout(
+        autosize=True,
+        height=360,
+        margin=dict(l=10, r=10, t=40, b=10),
+        xaxis_title="Minute",
+        yaxis_title="Cumulative xG",
+        hovermode="x unified",
+    )
     return fig
