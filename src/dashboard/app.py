@@ -154,7 +154,7 @@ def run():
 
     # Cumulative xG timeline
     timeline = cumulative_xg_plot(ms)
-    st.plotly_chart(timeline, use_container_width=False)
+    st.plotly_chart(timeline, use_container_width=True)
 
     # Shot map
     st.subheader("Shot Map & xG")
