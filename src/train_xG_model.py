@@ -1,6 +1,16 @@
+# src/train_xg_model.py
 from __future__ import annotations
-from sklearn.metrics import brier_score_loss, log_loss, roc_auc_score
+
+import json
+from pathlib import Path
+
+import joblib
+import numpy as np
+import pandas as pd
 from sklearn.calibration import CalibratedClassifierCV
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import brier_score_loss, log_loss, roc_auc_score
+from sklearn.model_selection import GroupKFold
 from xgboost import XGBClassifier
 
 from .config import settings
@@ -8,7 +18,7 @@ from .features_xg import FEATURE_COLUMNS, TARGET_COLUMN
 
 
 def _split_train_val(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
-    # group by match_id to avoid leakage
+    """Group-aware split by match_id to avoid leakage."""
     groups = df["match_id"].values
     gkf = GroupKFold(n_splits=5)
     idx_tr, idx_va = next(gkf.split(df, groups=groups))
@@ -29,7 +39,7 @@ def _build_model(kind: str = "xgb"):
             n_jobs=0,
             random_state=42,
         )
-    raise ValueError("unknown model kind")
+    raise ValueError("unknown model kind: use 'lr' or 'xgb'")
 
 
 def train(kind: str = "xgb", calibration: str = "isotonic") -> dict:
@@ -42,9 +52,8 @@ def train(kind: str = "xgb", calibration: str = "isotonic") -> dict:
     y_va = val_df[TARGET_COLUMN].values
 
     base = _build_model(kind)
-    clf = CalibratedClassifierCV(
-        base, method=("isotonic" if calibration == "isotonic" else "sigmoid")
-    )
+    method = "isotonic" if calibration == "isotonic" else "sigmoid"
+    clf = CalibratedClassifierCV(base, method=method)
     clf.fit(X_tr, y_tr)
 
     proba = clf.predict_proba(X_va)[:, 1]
