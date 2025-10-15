@@ -9,7 +9,7 @@ requests~=2.32
 tqdm~=4.66
 pydantic~=2.8
 matplotlib~=3.8
-plotly~=5.24
-streamlit~=1.37
+streamlit==1.39.0
+plotly==5.24.1
 mplsoccer~=1.2
 networkx~=3.3

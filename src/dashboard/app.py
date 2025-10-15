@@ -66,8 +66,7 @@ def _list_seasons_for_comp(comp_name: str) -> list[str]:
 
 
 def plot(fig) -> None:
-    """Single, future-proof way to render Plotly figs."""
-    st.plotly_chart(fig, width="stretch", config={"displayModeBar": False})
+    st.plotly_chart(fig, width="stretch")
 
 
 # ---------------------------------------------------------------------
@@ -364,7 +363,7 @@ def run() -> None:
         calibration_plot_path = settings.plots_dir / "calibration.png"
         if calibration_plot_path.exists():
             st.subheader("Model Calibration")
-            st.image(str(calibration_plot_path), use_container_width=True)
+            st.image(str(calibration_plot_path), width="stretch")
             st.caption(
                 "Calibration plot showing predicted xG vs actual goal rate"
             )
