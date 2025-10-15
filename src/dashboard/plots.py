@@ -5,9 +5,7 @@ import plotly.graph_objects as go
 
 
 def cumulative_xg_plot(df: pd.DataFrame) -> go.Figure:
-    s = (
-        df.sort_values("minute").assign(cum_xg=df["xg"].cumsum())
-    )
+    s = df.sort_values("minute").assign(cum_xg=df["xg"].cumsum())
     fig = go.Figure()
     fig.add_scatter(
         x=s["minute"],

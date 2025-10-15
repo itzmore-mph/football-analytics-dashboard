@@ -32,16 +32,10 @@ def _extract_shots(ev: pd.DataFrame) -> pd.DataFrame:
     if "location" not in shots.columns:
         shots["location"] = None
     loc = shots["location"].apply(
-        lambda v: v if isinstance(v, list) and len(v) >= 2 else [
-            np.nan, np.nan
-        ]
+        lambda v: v if isinstance(v, list) and len(v) >= 2 else [np.nan, np.nan]
     )
-    shots["location.x"] = loc.apply(
-        lambda xy: float(xy[0]) if xy and xy[0] is not None else np.nan
-    )
-    shots["location.y"] = loc.apply(
-        lambda xy: float(xy[1]) if xy and xy[1] is not None else np.nan
-    )
+    shots["location.x"] = loc.apply(lambda xy: float(xy[0]) if xy and xy[0] is not None else np.nan)
+    shots["location.y"] = loc.apply(lambda xy: float(xy[1]) if xy and xy[1] is not None else np.nan)
 
     # Keep a stable set of columns for feature builder
     keep = [
