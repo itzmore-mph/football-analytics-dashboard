@@ -1,8 +1,9 @@
+# src/dashboard/app.py
 from __future__ import annotations
 
-from collections.abc import Callable
-from typing import Any, TypeVar, cast
+from typing import Any, cast
 
+import json
 import joblib
 import pandas as pd
 from mplsoccer import Pitch
@@ -13,8 +14,6 @@ from src.dashboard.components import metric_badge, sidebar_filters
 from src.dashboard.plots import cumulative_xg_plot
 from src.dashboard.theming import set_theme
 from src.features_xg import FEATURE_COLUMNS
-
-F = TypeVar("F", bound=Callable[..., Any])
 
 # Streamlit safe imports / stubs
 try:
@@ -29,7 +28,7 @@ except Exception:
         def __getattr__(self, name: str):
             raise RuntimeError("Streamlit is required to run the dashboard")
 
-    st = _StreamlitStub()
+    st = _StreamlitStub()  # type: ignore[assignment]
 
     def _cache_data(*_a: Any, **_k: Any):
         def _wrap(func):
@@ -47,26 +46,33 @@ except Exception:
     cache_resource = cast(Any, _cache_resource)
 
 
-def plot(fig):
+@cache_data(show_spinner=False)
+def _list_competitions_df() -> pd.DataFrame:
+    from src.open_data import competitions
+
+    return competitions()
+
+
+@cache_data(show_spinner=False)
+def _list_seasons_for_comp(comp_name: str) -> list[str]:
+    df = _list_competitions_df()
+    return (
+        df.loc[df["competition_name"] == comp_name, "season_name"]
+        .dropna()
+        .drop_duplicates()
+        .sort_values(ascending=False)
+        .tolist()
+    )
+
+
+def plot(fig) -> None:
+    """Single, future-proof way to render Plotly figs."""
     st.plotly_chart(fig, width="stretch", config={"displayModeBar": False})
 
 
-# LEGACY (catch deprecated kwargs)
-_real_plotly_chart = st.plotly_chart
-_ALLOWED = {"width", "height", "config", "key"}
-
-
-def _guard_plotly_chart(*args, **kwargs):
-    bad = [k for k in kwargs if k not in _ALLOWED]
-    if bad:
-        raise RuntimeError(f"Deprecated kwargs to st.plotly_chart: {bad}")
-    return _real_plotly_chart(*args, **kwargs)
-
-
-st.plotly_chart = _guard_plotly_chart
-
-
-# Cloud bootstrap
+# ---------------------------------------------------------------------
+# Cloud/bootstrap helpers
+# ---------------------------------------------------------------------
 def _artifacts_exist() -> bool:
     return all(
         [
@@ -80,7 +86,7 @@ def _artifacts_exist() -> bool:
 @cache_resource(show_spinner=False)
 def _build_demo_artifacts() -> dict:
     """
-    One-time builder for a tiny demo dataset on Streamlit Cloud:
+    One-time builder for a tiny demo dataset:
     fetch -> passing CSV -> shots CSV -> train model.
     Cached as a resource so it runs only when you click the button.
     """
@@ -102,7 +108,9 @@ def _build_demo_artifacts() -> dict:
     return {"matches": mids, "metrics": metrics}
 
 
+# ---------------------------------------------------------------------
 # Data/model loaders
+# ---------------------------------------------------------------------
 @cache_data(show_spinner=False)
 def load_data() -> tuple[pd.DataFrame, pd.DataFrame]:
     shots = (
@@ -125,8 +133,10 @@ def load_model():
     return None
 
 
+# ---------------------------------------------------------------------
 # App
-def run():
+# ---------------------------------------------------------------------
+def run() -> None:
     set_theme()
     st.title("⚽ Football Analytics Dashboard")
     st.markdown("*Statistical analysis powered by StatsBomb Open Data*")
@@ -139,9 +149,7 @@ def run():
                 "(fetch → feature → train)."
             )
             if st.button("Build demo data now"):
-                with st.spinner(
-                    "Building demo data… this is a one-time step."
-                ):
+                with st.spinner("Building demo data… "):
                     _ = _build_demo_artifacts()
                 st.success("Demo data built. Reloading…")
                 st.rerun()
@@ -152,23 +160,55 @@ def run():
     shots, passes = load_data()
     model = load_model()
     if shots.empty or passes.empty or model is None:
-        st.warning(
-            "Artifacts missing. Please click **Build demo data now** above."
-        )
+        st.warning("Artifacts missing. Please click **Build demo data now**")
         st.stop()
 
     # Predict xG for shots
     shots = shots.copy()
     shots["xg"] = model.predict_proba(shots[FEATURE_COLUMNS].values)[:, 1]
 
-    # Global selectors
+    # Sidebar — Match selection (with friendly labels)
     st.sidebar.markdown("---")
     st.sidebar.subheader("Match Selection")
+
+    def _match_label(mid: int) -> str:
+        # Prefer persisted fixture + date from preprocessing
+        if "fixture" in shots.columns:
+            lab = (
+                shots.loc[shots["match_id"] == mid, "fixture"]
+                .dropna()
+                .astype(str)
+                .head(1)
+                .tolist()
+            )
+            if lab:
+                if "match_date" in shots.columns:
+                    md = (
+                        pd.to_datetime(
+                            shots.loc[shots["match_id"] == mid, "match_date"]
+                        )
+                        .dropna()
+                        .astype(str)
+                        .head(1)
+                        .tolist()
+                    )
+                    return f"{lab[0]} — {md[0]}" if md else lab[0]
+                return lab[0]
+        # Fallback: infer two team names from shots
+        teams = (
+            shots.loc[shots["match_id"] == mid, "team.name"]
+            .dropna()
+            .unique()
+            .tolist()
+        )
+        vs = " vs ".join(teams[:2]) if teams else f"Match {mid}"
+        return f"{vs} — {mid}"
+
     matches = sorted(shots["match_id"].unique().tolist())
-    match_id = st.sidebar.selectbox("Match", matches)
-    teams = (
-        shots.loc[shots["match_id"] == match_id, "team.name"].unique().tolist()
-    )
+    match_id = st.sidebar.selectbox("Match", matches, format_func=_match_label)
+    teams = shots.loc[
+        shots["match_id"] == match_id, "team.name"
+    ].unique().tolist()
     team = st.sidebar.selectbox("Team (for passing network)", teams, index=0)
 
     # Filter shots by match and minute range
@@ -190,7 +230,7 @@ def run():
     if selected_players:
         ms = ms[ms["player.name"].isin(selected_players)]
 
-    # Create tabs
+    # Tabs
     (
         tab_overview,
         tab_xg_pitch,
@@ -208,6 +248,7 @@ def run():
     )
 
     # Tab 1: Overview
+
     with tab_overview:
         st.header("Match Overview")
 
@@ -226,11 +267,12 @@ def run():
             st.metric("Goals", int(ms["is_goal"].sum()))
         with col3:
             shots_on_target = len(ms[ms["is_goal"] == 1])
-            if len(ms) > 0:
-                conversion_rate = 100 * shots_on_target / len(ms)
-                st.metric("Conversion %", f"{conversion_rate:.1f}%")
-            else:
-                st.metric("Conversion %", "0%")
+            conv = (
+                f"{(100 * shots_on_target / len(ms)):.1f}%"
+                if len(ms)
+                else "0%"
+            )
+            st.metric("Conversion %", conv)
 
         # Cumulative xG timeline
         st.subheader("Cumulative xG Timeline")
@@ -240,22 +282,22 @@ def run():
         # Data freshness
         st.markdown("---")
         st.caption(
-            f"📅 Data loaded from {len(shots)} total shots across "
-            f"{len(matches)} matches"
+            (
+                f"📅 Data loaded from {len(shots)} total shots across "
+                f"{len(matches)} matches"
+            )
         )
 
     # Tab 2: xG Model & Pitch
-    with tab_xg_pitch:
-        import json
 
+    with tab_xg_pitch:
         st.header("Shot Map & xG Model")
 
-        # Show model metrics if available
+        # Model summary (if available)
         model_report_path = settings.models_dir / "model_report.json"
         if model_report_path.exists():
             with open(model_report_path) as f:
                 metrics = json.load(f)
-
             col1, col2, col3 = st.columns(3)
             with col1:
                 st.metric("ROC-AUC", f"{metrics.get('roc_auc', 0):.3f}")
@@ -288,10 +330,14 @@ def run():
                 if r["is_goal"] == 1
                 else ("#fbbf24" if r["xg"] >= xg_threshold else "#ef4444")
             )
-            color = base_color
-            if selected_players and r.get("player.name") in selected_players:
-                color = "#60a5fa"  # highlight selected players
-
+            color = (
+                "#60a5fa"
+                if (
+                    selected_players
+                    and r.get("player.name") in selected_players
+                )
+                else base_color
+            )
             pitch.scatter(
                 r["location.x"],
                 r["location.y"],
@@ -303,7 +349,7 @@ def run():
                 linewidth=0.5,
             )
 
-        # Add legend
+        # Legend
         from matplotlib.patches import Patch
 
         legend_elements = [
@@ -312,10 +358,9 @@ def run():
             Patch(facecolor="#ef4444", label=f"Low xG (<{xg_threshold})"),
         ]
         ax.legend(handles=legend_elements, loc="upper left", framealpha=0.8)
-
         st.pyplot(fig, clear_figure=True)
 
-        # Display calibration plot if available
+        # Calibration plot (if available)
         calibration_plot_path = settings.plots_dir / "calibration.png"
         if calibration_plot_path.exists():
             st.subheader("Model Calibration")
@@ -324,7 +369,9 @@ def run():
                 "Calibration plot showing predicted xG vs actual goal rate"
             )
 
+    # -----------------------------------------------------------------
     # Tab 3: Passing Network
+    # -----------------------------------------------------------------
     with tab_passing:
         from src.passing_network import build_team_network
 
@@ -337,17 +384,16 @@ def run():
             min_edge=filters["pass_threshold"],
         )
 
-        # Network stats
         col1, col2, col3 = st.columns(3)
         with col1:
             st.metric("Players", len(net.nodes))
         with col2:
             st.metric("Passing Connections", len(net.edges))
         with col3:
-            if not net.edges.empty:
-                st.metric("Max Passes", int(net.edges["count"].max()))
-            else:
-                st.metric("Max Passes", 0)
+            st.metric(
+                "Max Passes",
+                int(net.edges["count"].max()) if not net.edges.empty else 0,
+            )
 
         if net.edges.empty:
             st.info(
@@ -375,8 +421,7 @@ def run():
                 if not isinstance(value, str) or not value:
                     return ""
                 s = value.strip()
-                # If it's numeric-like (no letters), don't split—display as-is
-                if not any(ch.isalpha() for ch in s):
+                if not any(ch.isalpha() for ch in s):  # numeric-like id
                     return s
                 return s.split()[-1]
 
@@ -388,10 +433,8 @@ def run():
                 dst = net.nodes[net.nodes["player"] == e["target"]][
                     ["x_mean", "y_mean"]
                 ].mean()
-
                 if pd.isna(src["x_mean"]) or pd.isna(dst["x_mean"]):
                     continue
-
                 lw = 0.5 + (e["count"] / edge_scale) * 5
                 pitch.lines(
                     src["x_mean"],
@@ -407,13 +450,14 @@ def run():
 
             # Draw nodes (highlight selected players if any)
             for _, n in net.nodes.iterrows():
-                node_color = "#60a5fa"
-                is_selected = (
-                    bool(selected_players)
-                    and n.get("player_name") in selected_players
+                node_color = (
+                    "#22c55e"
+                    if (
+                        selected_players
+                        and n.get("player_name") in selected_players
+                    )
+                    else "#60a5fa"
                 )
-                if is_selected:
-                    node_color = "#22c55e"
                 pitch.scatter(
                     n["x_mean"],
                     n["y_mean"],
@@ -437,7 +481,9 @@ def run():
 
             st.pyplot(fig2, clear_figure=True)
 
+    # -----------------------------------------------------------------
     # Tab 4: Statistics
+    # -----------------------------------------------------------------
     with tab_stats:
         st.header("Statistics")
 
@@ -463,22 +509,20 @@ def run():
         ]
         st.dataframe(team_stats, width="stretch")
 
-        # Player-level stats (top scorers by xG)
+        # Player-level stats
         st.subheader("Top Players by xG")
         if "player.name" in ms.columns:
             player_stats = (
                 ms.groupby("player.name")
                 .agg({"xg": "sum", "is_goal": "sum", "shot_distance": "mean"})
                 .round(2)
+                .sort_values("xg", ascending=False)
+                .head(10)
             )
             player_stats.columns = ["Total xG", "Goals", "Avg Distance"]
-            player_stats = player_stats.sort_values(
-                "Total xG", ascending=False
-            )
-            player_stats = player_stats.head(10)
             st.dataframe(player_stats, width="stretch")
 
-        # Export functionality
+        # Export shots
         st.subheader("Export Data")
         csv = ms.to_csv(index=False).encode("utf-8")
         st.download_button(
@@ -488,20 +532,20 @@ def run():
             mime="text/csv",
         )
 
+    # -----------------------------------------------------------------
     # Tab 5: Settings
+    # -----------------------------------------------------------------
     with tab_settings:
         st.header("Settings")
 
         st.subheader("Cache Management")
         st.markdown("Clear cached data to force a refresh from source.")
-
         col1, col2 = st.columns(2)
         with col1:
             if st.button("🔄 Clear Data Cache"):
                 load_data.clear()
                 st.success("Data cache cleared!")
                 st.rerun()
-
         with col2:
             if st.button("🔄 Clear Model Cache"):
                 load_model.clear()
@@ -512,47 +556,87 @@ def run():
         st.subheader("Data Source")
         st.markdown("**StatsBomb Open Data**")
         st.markdown(
-            "Data is fetched from: " "https://github.com/statsbomb/open-data"
+            "Data is fetched from: https://github.com/statsbomb/open-data"
         )
 
-        # Build more data (fast path via collect_full_matches)
-        st.subheader("Build more data")
-        colA, colB = st.columns([3, 1])
-        with colA:
-            n = st.slider(
-                "How many additional matches to fetch & process", 4, 120, 20, 4
-            )
-        with colB:
-            if st.button("Fetch & preprocess more matches"):
-                with st.spinner("Fetching matches & building artifacts..."):
-                    from src.open_data import collect_full_matches
-                    from src.passing_network import (
-                        build_and_save_passing_events,
-                    )
-                    from src.preprocess_shots import build_processed_shots
+        # Add matches by competition/season (targeted)
+        st.subheader("Add matches by competition / season")
+        with st.form("add_by_comp_season"):
+            col1, col2, col3 = st.columns([2, 2, 1])
+            with col1:
+                comp_options = sorted(
+                    _list_competitions_df()["competition_name"]
+                    .dropna()
+                    .unique()
+                    .tolist()
+                )
+                default_idx = (
+                    comp_options.index("NWSL") if "NWSL" in comp_options else 0
+                )
+                comp_name = st.selectbox(
+                    "Competition", comp_options, index=default_idx
+                )
+            with col2:
+                season_opts = ["(latest)"] + _list_seasons_for_comp(comp_name)
+                season_choice = st.selectbox("Season", season_opts, index=0)
+                season_name = (
+                    None if season_choice == "(latest)" else season_choice
+                )
+            with col3:
+                n_comp = st.number_input(
+                    "How many matches",
+                    min_value=4,
+                    max_value=200,
+                    value=20,
+                    step=4,
+                )
+            submitted = st.form_submit_button("Fetch & preprocess")
 
-                    mids = collect_full_matches(limit=n)
+        if submitted:
+            from src.open_data import collect_matches_by_name
+            from src.passing_network import build_and_save_passing_events
+            from src.preprocess_shots import build_processed_shots
+
+            try:
+                with st.spinner("Fetching matches & building artifacts..."):
+                    mids = collect_matches_by_name(
+                        competition_name=comp_name,
+                        season_name=season_name or None,
+                        limit=int(n_comp),
+                    )
                     build_and_save_passing_events(mids)
                     build_processed_shots(mids)
-                st.success(f"Added/updated {len(mids)} matches. Reloading…")
+                st.success(
+                    f"Added/updated {len(mids)} matches from {comp_name} "
+                    f"{season_name or ''}. Reloading…"
+                )
                 st.rerun()
+            except Exception as e:
+                st.error(f"Could not fetch matches: {e}")
+
         st.markdown("---")
         st.subheader("About")
         st.markdown(
             """
-        This dashboard provides football analytics using Expected Goals (xG)
-        modeling and passing network analysis.
+            (
+                (
+                (
+                    "This dashboard provides football analytics using "
+                    "Expected Goals (xG) "
+                )
+                "modeling and passing network analysis."
+            )
 
-        **Features:**
-        - xG prediction using XGBoost with calibration
-        - Shot maps with xG visualization
-        - Passing networks with player positions
-        - Team and player statistics
-        """
+            **Features:**
+            - xG prediction using XGBoost with calibration
+            - Shot maps with xG visualization
+            - Passing networks with player positions
+            - Team and player statistics
+            """
         )
 
         st.markdown("---")
         st.info(
-            "💡 **Tip:** Use the sidebar filters to adjust minute range"
+            "💡 **Tip:** Use the sidebar filters to adjust minute range "
             "and passing thresholds."
         )

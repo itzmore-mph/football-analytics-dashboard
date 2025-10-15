@@ -15,9 +15,36 @@ from .utils_io import save_csv
 def _extract_shots(ev: pd.DataFrame) -> pd.DataFrame:
     shots = ev[ev["type.name"] == "Shot"].copy()
 
-    # Keep StatsBomb event id if present (for stable dedup later)
-    if "id" not in shots.columns:
-        shots["id"] = np.nan
+    # ---- Fixture metadata (persist for friendly UI labels) -----------------
+    # Try to infer home/away & date; fall back to two unique team names
+    team_series = ev.get("team.name")
+    team_list = (
+        team_series.dropna().unique().tolist()
+        if isinstance(team_series, pd.Series)
+        else []
+    )
+    # Some event payloads don't include true home/away;
+    # use deterministic fallback
+    t1, t2 = (team_list + ["Unknown", "Unknown"])[:2]
+    # If events happen to carry explicit home/away names, prefer them
+    home_team = t1
+    away_team = t2
+    if (
+        "home_team.home_team_name" in ev.columns
+        and ev["home_team.home_team_name"].notna().any()
+    ):
+        home_team = str(ev["home_team.home_team_name"].dropna().iloc[0])
+    if (
+        "away_team.away_team_name" in ev.columns
+        and ev["away_team.away_team_name"].notna().any()
+    ):
+        away_team = str(ev["away_team.away_team_name"].dropna().iloc[0])
+    match_date = (
+        pd.to_datetime(ev["match_date"].dropna().iloc[0])
+        if "match_date" in ev.columns and ev["match_date"].notna().any()
+        else pd.NaT
+    )
+    fixture_label = f"{home_team} vs {away_team}"
 
     # Ensure optional columns exist (StatsBomb sometimes omits them)
     optional_defaults: dict[str, object] = {
@@ -37,9 +64,7 @@ def _extract_shots(ev: pd.DataFrame) -> pd.DataFrame:
     if "location" not in shots.columns:
         shots["location"] = None
     loc = shots["location"].apply(
-        lambda v: (
-            v if isinstance(v, list) and len(v) >= 2 else [np.nan, np.nan]
-        )
+        lambda v: (v if isinstance(v, list) and len(v) >= 2 else [np.nan, np.nan])
     )
     shots["location.x"] = loc.apply(
         lambda xy: float(xy[0]) if xy and xy[0] is not None else np.nan
@@ -71,6 +96,12 @@ def _extract_shots(ev: pd.DataFrame) -> pd.DataFrame:
 
     # Downstream feature engineering
     shots = build_basic_features(shots)
+
+    # Attach fixture metadata (constant per match)
+    shots["home_team"] = home_team
+    shots["away_team"] = away_team
+    shots["fixture"] = fixture_label
+    shots["match_date"] = match_date
     return shots
 
 

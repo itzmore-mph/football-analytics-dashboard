@@ -1,5 +1,16 @@
 README.md
 pyproject.toml
+src/__init__.py
+src/cli.py
+src/config.py
+src/evaluate_xg.py
+src/features_xg.py
+src/open_data.py
+src/passing_network.py
+src/preprocess_shots.py
+src/sitecustomize.py
+src/train_xg_model.py
+src/utils_io.py
 src/dashboard/__init__.py
 src/dashboard/app.py
 src/dashboard/components.py
@@ -15,5 +26,6 @@ src/football_analytics_dashboard.egg-info/requires.txt
 src/football_analytics_dashboard.egg-info/top_level.txt
 tests/test__preprocess_shots.py
 tests/test_cli.py
+tests/test_dashboard.py
 tests/test_features_xg.py
 tests/test_passing_network.py

@@ -21,21 +21,15 @@ class NetworkResult:
 def _extract_passes(ev: pd.DataFrame) -> pd.DataFrame:
     df = ev[ev["type.name"] == "Pass"].copy()
     # locations
-    loc = df["location"].apply(
-        lambda v: v if isinstance(v, list) else [None, None]
-    )
+    loc = df["location"].apply(lambda v: v if isinstance(v, list) else [None, None])
     df["x"] = loc.apply(
         lambda location: (
-            float(location[0])
-            if location and location[0] is not None
-            else None
+            float(location[0]) if location and location[0] is not None else None
         )
     )
     df["y"] = loc.apply(
         lambda location: (
-            float(location[1])
-            if location and location[1] is not None
-            else None
+            float(location[1]) if location and location[1] is not None else None
         )
     )
     end = df["pass.end_location"].apply(
@@ -43,16 +37,12 @@ def _extract_passes(ev: pd.DataFrame) -> pd.DataFrame:
     )
     df["x_end"] = end.apply(
         lambda location: (
-            float(location[0])
-            if location and location[0] is not None
-            else None
+            float(location[0]) if location and location[0] is not None else None
         )
     )
     df["y_end"] = end.apply(
         lambda location: (
-            float(location[1])
-            if location and location[1] is not None
-            else None
+            float(location[1]) if location and location[1] is not None else None
         )
     )
     # receiver
@@ -87,18 +77,14 @@ def build_team_network(
         )
         .reset_index()
     )
-    nodes = starts.merge(
-        recvs, left_on="player.name", right_on="receiver", how="outer"
-    )
+    nodes = starts.merge(recvs, left_on="player.name", right_on="receiver", how="outer")
     nodes["x_mean"] = nodes[["x", "x_recv"]].mean(axis=1)
     nodes["y_mean"] = nodes[["y", "y_recv"]].mean(axis=1)
     nodes["touches"] = nodes[["touches", "received"]].fillna(0).sum(axis=1)
     nodes = nodes.rename(columns={"player.name": "player"})
     # Guarantee a human-readable label column for UI
     nodes["player_name"] = nodes["player"].astype(str)
-    nodes = nodes[
-        ["player", "player_name", "x_mean", "y_mean", "touches"]
-    ].fillna(0)
+    nodes = nodes[["player", "player_name", "x_mean", "y_mean", "touches"]].fillna(0)
 
     # edges: completed passes player -> receiver
     # (completed when outcome is NaN in SB data)
@@ -109,9 +95,7 @@ def build_team_network(
         .reset_index(name="count")
         .rename(columns={"player.name": "source", "receiver": "target"})
     )
-    edges = edges[edges["count"] >= max(1, int(min_edge))].reset_index(
-        drop=True
-    )
+    edges = edges[edges["count"] >= max(1, int(min_edge))].reset_index(drop=True)
 
     # OPTIONAL graph metrics: degree centrality
     G = nx.DiGraph()

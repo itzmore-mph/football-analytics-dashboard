@@ -68,9 +68,7 @@ def train_cmd(
     ] = "xgb",
     calibration: Annotated[
         Literal["isotonic", "platt", "sigmoid"],
-        typer.Option(
-            "--calibration", help="Calibration method: isotonic|platt"
-        ),
+        typer.Option("--calibration", help="Calibration method: isotonic|platt"),
     ] = "isotonic",
 ) -> None:
     try:

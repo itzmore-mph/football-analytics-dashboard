@@ -7,7 +7,7 @@ name = "football-analytics-dashboard"
 version = "0.1.0"
 description = "xG model + passing networks + Streamlit dashboard using StatsBomb Open Data"
 readme = "README.md"
-authors = [{ name = "Mo" }]
+authors = [{ name = "Moritz Philipp Haaf" }]
 requires-python = ">=3.10"
 dependencies = [
   "pandas>=2.0",
@@ -33,24 +33,21 @@ dev = [
   "ruff>=0.6.9",
   "black>=24.8",
   "isort>=5.13",
+  "flake8>=7.1",
 ]
 
-# Package configuration
-[tool.setuptools]
-packages = ["src", "src.dashboard", "src.dashboard.pages"]
-
 [tool.black]
-line-length = 79
+line-length = 88
 target-version = ["py310"]
 
 [tool.isort]
 profile = "black"
-line_length = 79
+line_length = 88
 
 [tool.ruff]
-line-length = 100
+line-length = 88
 lint.select = ["E", "F", "I", "B", "UP"]
 
 [tool.flake8]
-max-line-length = 79
-extend-ignore = ["E203"]
+max-line-length = 88
+extend-ignore = ["E203", "W503"]
