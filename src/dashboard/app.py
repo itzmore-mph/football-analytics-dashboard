@@ -120,7 +120,9 @@ def run():
                 "(fetch → feature → train)."
             )
             if st.button("Build demo data now"):
-                with st.spinner("Building demo data… this is a one-time step."):
+                with st.spinner(
+                    "Building demo data… this is a one-time step."
+                ):
                     _ = _build_demo_artifacts()
                 st.success("Demo data built. Reloading…")
                 st.rerun()
@@ -131,7 +133,9 @@ def run():
     shots, passes = load_data()
     model = load_model()
     if shots.empty or passes.empty or model is None:
-        st.warning("Artifacts missing. Please click **Build demo data now** above.")
+        st.warning(
+            "Artifacts missing. Please click **Build demo data now** above."
+        )
         st.stop()
 
     # Predict xG for shots
@@ -143,7 +147,9 @@ def run():
     st.sidebar.subheader("Match Selection")
     matches = sorted(shots["match_id"].unique().tolist())
     match_id = st.sidebar.selectbox("Match", matches)
-    teams = shots.loc[shots["match_id"] == match_id, "team.name"].unique().tolist()
+    teams = shots.loc[
+        shots["match_id"] == match_id, "team.name"
+    ].unique().tolist()
     team = st.sidebar.selectbox("Team (for passing network)", teams, index=0)
 
     # Filter shots by match and minute range
@@ -192,18 +198,28 @@ def run():
         with col3:
             shots_on_target = len(ms[ms["is_goal"] == 1])
             if len(ms) > 0:
-                st.metric("Conversion %", f"{100 * shots_on_target / len(ms):.1f}%")
+                conversion_rate = (
+                    100 * shots_on_target / len(ms)
+                )
+                st.metric("Conversion %", f"{conversion_rate:.1f}%")
             else:
                 st.metric("Conversion %", "0%")
 
         # Cumulative xG timeline
         st.subheader("Cumulative xG Timeline")
         timeline = cumulative_xg_plot(ms)
-        st.plotly_chart(timeline, use_container_width=True)
+        st.plotly_chart(
+            timeline,
+            width="stretch",
+            config={"displayModeBar": False}
+        )
 
         # Data freshness
         st.markdown("---")
-        st.caption(f"📅 Data loaded from {len(shots)} total shots across {len(matches)} matches")
+        st.caption(
+            f"📅 Data loaded from {len(shots)} total shots across "
+            f"{len(matches)} matches"
+        )
 
     # Tab 2: xG Model & Pitch
     with tab_xg_pitch:
@@ -236,7 +252,11 @@ def run():
 
         # Shot map
         st.subheader("Shot Map")
-        pitch = Pitch(pitch_type="statsbomb", pitch_color="#0B132B", line_color="#E5E7EB")
+        pitch = Pitch(
+            pitch_type="statsbomb",
+            pitch_color="#0B132B",
+            line_color="#E5E7EB",
+        )
         fig, ax = pitch.draw(figsize=(12, 8))
 
         for _, r in ms.iterrows():
@@ -274,8 +294,11 @@ def run():
         calibration_plot_path = settings.plots_dir / "calibration.png"
         if calibration_plot_path.exists():
             st.subheader("Model Calibration")
-            st.image(str(calibration_plot_path), use_container_width=True)
-            st.caption("Calibration plot showing predicted xG vs actual goal rate")
+            st.image(str(calibration_plot_path), width="stretch")
+            st.caption(
+                "Calibration plot showing predicted xG vs "
+                "actual goal rate"
+            )
 
     # Tab 3: Passing Network
     with tab_passing:
@@ -285,7 +308,9 @@ def run():
         st.markdown(f"**Team:** {team}")
 
         net = build_team_network(
-            match_id=match_id, team_name=team, min_edge=filters["pass_threshold"]
+            match_id=match_id,
+            team_name=team,
+            min_edge=filters["pass_threshold"],
         )
 
         # Network stats
@@ -301,17 +326,44 @@ def run():
                 st.metric("Max Passes", 0)
 
         if net.edges.empty:
-            st.info(f"No passing connections with at least {filters['pass_threshold']} passes.")
+            st.info(
+                f"No passing connections with at least "
+                f"{filters['pass_threshold']} passes."
+            )
         else:
-            pitch = Pitch(pitch_type="statsbomb", pitch_color="#0B132B", line_color="#E5E7EB")
+            pitch = Pitch(
+                pitch_type="statsbomb",
+                pitch_color="#0B132B",
+                line_color="#E5E7EB",
+            )
             fig2, ax2 = pitch.draw(figsize=(12, 8))
 
             edge_scale = max(1.0, float(net.edges["count"].max() or 0))
 
+            # Ensure player_name column exists for labeling
+            if "player_name" not in net.nodes.columns:
+                if "player" in net.nodes.columns:
+                    net.nodes["player_name"] = net.nodes["player"].astype(str)
+                else:
+                    net.nodes["player_name"] = ""
+
+            def _display_last_name(value: str) -> str:
+                if not isinstance(value, str) or not value:
+                    return ""
+                s = value.strip()
+                # If it's numeric-like (no letters), don't split—display as-is
+                if not any(ch.isalpha() for ch in s):
+                    return s
+                return s.split()[-1]
+
             # Draw edges
             for _, e in net.edges.iterrows():
-                src = net.nodes[net.nodes["player"] == e["source"]][["x_mean", "y_mean"]].mean()
-                dst = net.nodes[net.nodes["player"] == e["target"]][["x_mean", "y_mean"]].mean()
+                src = net.nodes[
+                    net.nodes["player"] == e["source"]
+                ][["x_mean", "y_mean"]].mean()
+                dst = net.nodes[
+                    net.nodes["player"] == e["target"]
+                ][["x_mean", "y_mean"]].mean()
 
                 if pd.isna(src["x_mean"]) or pd.isna(dst["x_mean"]):
                     continue
@@ -340,10 +392,11 @@ def run():
                     edgecolors="#1f2937",
                     linewidth=2,
                 )
+                label = _display_last_name(n.get("player_name", ""))
                 ax2.text(
                     n["x_mean"],
                     n["y_mean"] - 2,
-                    n["player"].split(" ")[-1],
+                    label,
                     ha="center",
                     va="top",
                     fontsize=8,
@@ -361,11 +414,21 @@ def run():
         st.subheader("Team Statistics")
         team_stats = (
             ms.groupby("team.name")
-            .agg({"xg": ["sum", "mean"], "is_goal": ["sum", "count"], "shot_distance": "mean"})
+            .agg({
+                "xg": ["sum", "mean"],
+                "is_goal": ["sum", "count"],
+                "shot_distance": "mean",
+            })
             .round(2)
         )
-        team_stats.columns = ["Total xG", "Avg xG per Shot", "Goals", "Shots", "Avg Distance"]
-        st.dataframe(team_stats, use_container_width=True)
+        team_stats.columns = [
+            "Total xG",
+            "Avg xG per Shot",
+            "Goals",
+            "Shots",
+            "Avg Distance"
+        ]
+        st.dataframe(team_stats, width="stretch")
 
         # Player-level stats (top scorers by xG)
         st.subheader("Top Players by xG")
@@ -376,8 +439,11 @@ def run():
                 .round(2)
             )
             player_stats.columns = ["Total xG", "Goals", "Avg Distance"]
-            player_stats = player_stats.sort_values("Total xG", ascending=False).head(10)
-            st.dataframe(player_stats, use_container_width=True)
+            player_stats = player_stats.sort_values(
+                "Total xG", ascending=False
+            )
+            player_stats = player_stats.head(10)
+            st.dataframe(player_stats, width="stretch")
 
         # Export functionality
         st.subheader("Export Data")
@@ -412,15 +478,17 @@ def run():
         st.markdown("---")
         st.subheader("Data Source")
         st.markdown("**StatsBomb Open Data**")
-        st.markdown("Data is fetched from: https://github.com/statsbomb/open-data")
+        st.markdown(
+            "Data is fetched from: https://github.com/statsbomb/open-data"
+        )
 
         st.markdown("---")
         st.subheader("About")
         st.markdown(
             """
-        This dashboard provides football analytics using Expected Goals (xG) modeling 
-        and passing network analysis.
-        
+        This dashboard provides football analytics using Expected Goals (xG)
+        modeling and passing network analysis.
+
         **Features:**
         - xG prediction using XGBoost with calibration
         - Shot maps with xG visualization
@@ -431,5 +499,6 @@ def run():
 
         st.markdown("---")
         st.info(
-            "💡 **Tip:** Use the sidebar filters to adjust minute range and passing thresholds."
+            "💡 **Tip:** Use the sidebar filters to adjust minute range and "
+            "passing thresholds."
         )

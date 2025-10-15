@@ -15,6 +15,7 @@ src/passing_network.py
 src/preprocess_shots.py
 src/sitecustomize.py
 src/train_xG_model.py
+src/train_xg_model.py
 src/utils_io.py
 src/dashboard/__init__.py
 src/dashboard/app.py
@@ -26,5 +27,6 @@ src/dashboard/pages/2_Shot_Map_&_xG.py
 src/dashboard/pages/3_Passing_Network.py
 tests/test__preprocess_shots.py
 tests/test_cli.py
+tests/test_dashboard.py
 tests/test_features_xg.py
 tests/test_passing_network.py

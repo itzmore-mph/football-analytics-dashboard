@@ -2,10 +2,7 @@ from __future__ import annotations
 
 import pandas as pd
 
-from src.features_xg import (
-    FEATURE_COLUMNS,
-    build_basic_features,
-)
+from src.features_xg import FEATURE_COLUMNS, build_basic_features
 
 
 def test_build_basic_features_columns():

@@ -1,9 +1,6 @@
 """Tests for dashboard components and plots."""
 
-from __future__ import annotations
-
 import pandas as pd
-import pytest
 
 from src.dashboard.plots import cumulative_xg_plot
 
