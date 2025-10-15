@@ -319,7 +319,7 @@ def run():
         calibration_plot_path = settings.plots_dir / "calibration.png"
         if calibration_plot_path.exists():
             st.subheader("Model Calibration")
-            st.image(str(calibration_plot_path), width='stretch')
+            st.image(str(calibration_plot_path), use_container_width=True)
             st.caption(
                 "Calibration plot showing predicted xG vs actual goal rate"
             )
