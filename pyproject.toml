@@ -40,17 +40,17 @@ dev = [
 packages = ["src", "src.dashboard", "src.dashboard.pages"]
 
 [tool.black]
-line-length = 100
+line-length = 79
 target-version = ["py310"]
 
 [tool.isort]
 profile = "black"
-line_length = 100
+line_length = 79
 
 [tool.ruff]
 line-length = 100
 lint.select = ["E", "F", "I", "B", "UP"]
 
 [tool.flake8]
-max-line-length = 100
+max-line-length = 79
 extend-ignore = ["E203"]

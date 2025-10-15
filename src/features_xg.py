@@ -66,18 +66,32 @@ def build_basic_features(df: pd.DataFrame) -> pd.DataFrame:
     # Context features
     under_pressure = df["under_pressure"].astype("boolean")
     df["under_pressure"] = under_pressure.fillna(False).astype("int64")
-    df["minute"] = pd.to_numeric(df["minute"], errors="coerce").fillna(0).round().astype("int64")
+    df["minute"] = (
+        pd.to_numeric(df["minute"], errors="coerce")
+        .fillna(0)
+        .round()
+        .astype("int64")
+    )
 
     # Set-piece indicator (robust to variations in wording/case)
     df["is_set_piece"] = (
-        df["play_pattern.name"].fillna("").apply(SET_PIECE_REGEX.search).notnull()
+        df["play_pattern.name"]
+        .fillna("")
+        .apply(SET_PIECE_REGEX.search)
+        .notnull()
     ).astype("int64")
 
     # Target variable: 1 if goal, else 0
     outcome = df.get("shot.outcome.name")
     if outcome is None:
         outcome = pd.Series("", index=df.index, dtype="object")
-    df["is_goal"] = outcome.fillna("").astype(str).str.casefold().eq("goal").astype("int64")
+    df["is_goal"] = (
+        outcome.fillna("")
+        .astype(str)
+        .str.casefold()
+        .eq("goal")
+        .astype("int64")
+    )
 
     return df
 

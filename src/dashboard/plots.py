@@ -11,7 +11,7 @@ def cumulative_xg_plot(df: pd.DataFrame) -> go.Figure:
     # Check if we have team data
     if "team.name" in df.columns:
         teams = df["team.name"].unique()
-        colors = ["#60a5fa", "#ef4444", "#22c55e", "#fbbf24"]  # Blue, Red, Green, Yellow
+        colors = ["#60a5fa", "#ef4444", "#22c55e", "#fbbf24"]
 
         for i, team in enumerate(teams):
             team_df = df[df["team.name"] == team].sort_values("minute")
@@ -42,6 +42,8 @@ def cumulative_xg_plot(df: pd.DataFrame) -> go.Figure:
         xaxis_title="Minute",
         yaxis_title="Cumulative xG",
         hovermode="x unified",
-        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+        legend=dict(
+            orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1
+        ),
     )
     return fig

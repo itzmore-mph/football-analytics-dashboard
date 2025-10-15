@@ -47,6 +47,10 @@ except Exception:
     cache_resource = cast(Any, _cache_resource)
 
 
+def plot(fig):
+    st.plotly_chart(fig, width="stretch", config={"displayModeBar": False})
+
+
 # Cloud bootstrap
 def _artifacts_exist() -> bool:
     return all(
@@ -147,9 +151,9 @@ def run():
     st.sidebar.subheader("Match Selection")
     matches = sorted(shots["match_id"].unique().tolist())
     match_id = st.sidebar.selectbox("Match", matches)
-    teams = shots.loc[
-        shots["match_id"] == match_id, "team.name"
-    ].unique().tolist()
+    teams = (
+        shots.loc[shots["match_id"] == match_id, "team.name"].unique().tolist()
+    )
     team = st.sidebar.selectbox("Team (for passing network)", teams, index=0)
 
     # Filter shots by match and minute range
@@ -160,6 +164,16 @@ def run():
     if ms.empty:
         st.info("No shots in the selected minute range.")
         return
+
+    # Player filter
+    available_players = sorted(
+        ms.get("player.name", pd.Series(dtype=str)).dropna().unique().tolist()
+    )
+    selected_players = st.sidebar.multiselect(
+        "Players (filter shots & stats)", available_players
+    )
+    if selected_players:
+        ms = ms[ms["player.name"].isin(selected_players)]
 
     # Create tabs
     (
@@ -198,9 +212,7 @@ def run():
         with col3:
             shots_on_target = len(ms[ms["is_goal"] == 1])
             if len(ms) > 0:
-                conversion_rate = (
-                    100 * shots_on_target / len(ms)
-                )
+                conversion_rate = 100 * shots_on_target / len(ms)
                 st.metric("Conversion %", f"{conversion_rate:.1f}%")
             else:
                 st.metric("Conversion %", "0%")
@@ -208,11 +220,7 @@ def run():
         # Cumulative xG timeline
         st.subheader("Cumulative xG Timeline")
         timeline = cumulative_xg_plot(ms)
-        st.plotly_chart(
-            timeline,
-            width="stretch",
-            config={"displayModeBar": False}
-        )
+        plot(timeline)
 
         # Data freshness
         st.markdown("---")
@@ -260,12 +268,14 @@ def run():
         fig, ax = pitch.draw(figsize=(12, 8))
 
         for _, r in ms.iterrows():
-            if r["is_goal"] == 1:
-                color = "#22c55e"  # Green for goals
-            elif r["xg"] >= xg_threshold:
-                color = "#fbbf24"  # Yellow for high xG
-            else:
-                color = "#ef4444"  # Red for low xG
+            base_color = (
+                "#22c55e"
+                if r["is_goal"] == 1
+                else ("#fbbf24" if r["xg"] >= xg_threshold else "#ef4444")
+            )
+            color = base_color
+            if selected_players and r.get("player.name") in selected_players:
+                color = "#60a5fa"  # highlight selected players
 
             pitch.scatter(
                 r["location.x"],
@@ -296,8 +306,7 @@ def run():
             st.subheader("Model Calibration")
             st.image(str(calibration_plot_path), width="stretch")
             st.caption(
-                "Calibration plot showing predicted xG vs "
-                "actual goal rate"
+                "Calibration plot showing predicted xG vs actual goal rate"
             )
 
     # Tab 3: Passing Network
@@ -358,12 +367,12 @@ def run():
 
             # Draw edges
             for _, e in net.edges.iterrows():
-                src = net.nodes[
-                    net.nodes["player"] == e["source"]
-                ][["x_mean", "y_mean"]].mean()
-                dst = net.nodes[
-                    net.nodes["player"] == e["target"]
-                ][["x_mean", "y_mean"]].mean()
+                src = net.nodes[net.nodes["player"] == e["source"]][
+                    ["x_mean", "y_mean"]
+                ].mean()
+                dst = net.nodes[net.nodes["player"] == e["target"]][
+                    ["x_mean", "y_mean"]
+                ].mean()
 
                 if pd.isna(src["x_mean"]) or pd.isna(dst["x_mean"]):
                     continue
@@ -381,14 +390,21 @@ def run():
                     color="#94a3b8",
                 )
 
-            # Draw nodes
+            # Draw nodes (highlight selected players if any)
             for _, n in net.nodes.iterrows():
+                node_color = "#60a5fa"
+                is_selected = (
+                    bool(selected_players)
+                    and n.get("player_name") in selected_players
+                )
+                if is_selected:
+                    node_color = "#22c55e"
                 pitch.scatter(
                     n["x_mean"],
                     n["y_mean"],
                     s=80 + 3 * n["touches"],
                     ax=ax2,
-                    color="#60a5fa",
+                    color=node_color,
                     edgecolors="#1f2937",
                     linewidth=2,
                 )
@@ -414,11 +430,13 @@ def run():
         st.subheader("Team Statistics")
         team_stats = (
             ms.groupby("team.name")
-            .agg({
-                "xg": ["sum", "mean"],
-                "is_goal": ["sum", "count"],
-                "shot_distance": "mean",
-            })
+            .agg(
+                {
+                    "xg": ["sum", "mean"],
+                    "is_goal": ["sum", "count"],
+                    "shot_distance": "mean",
+                }
+            )
             .round(2)
         )
         team_stats.columns = [
@@ -426,7 +444,7 @@ def run():
             "Avg xG per Shot",
             "Goals",
             "Shots",
-            "Avg Distance"
+            "Avg Distance",
         ]
         st.dataframe(team_stats, width="stretch")
 
@@ -479,9 +497,30 @@ def run():
         st.subheader("Data Source")
         st.markdown("**StatsBomb Open Data**")
         st.markdown(
-            "Data is fetched from: https://github.com/statsbomb/open-data"
+            "Data is fetched from: " "https://github.com/statsbomb/open-data"
         )
 
+        # Build more data (fast path via collect_full_matches)
+        st.subheader("Build more data")
+        colA, colB = st.columns([3, 1])
+        with colA:
+            n = st.slider(
+                "How many additional matches to fetch & process", 4, 120, 20, 4
+            )
+        with colB:
+            if st.button("Fetch & preprocess more matches"):
+                with st.spinner("Fetching matches & building artifacts..."):
+                    from src.open_data import collect_full_matches
+                    from src.passing_network import (
+                        build_and_save_passing_events,
+                    )
+                    from src.preprocess_shots import build_processed_shots
+
+                    mids = collect_full_matches(limit=n)
+                    build_and_save_passing_events(mids)
+                    build_processed_shots(mids)
+                st.success(f"Added/updated {len(mids)} matches. Reloading…")
+                st.rerun()
         st.markdown("---")
         st.subheader("About")
         st.markdown(
@@ -499,6 +538,6 @@ def run():
 
         st.markdown("---")
         st.info(
-            "💡 **Tip:** Use the sidebar filters to adjust minute range and "
-            "passing thresholds."
+            "💡 **Tip:** Use the sidebar filters to adjust minute range"
+            "and passing thresholds."
         )

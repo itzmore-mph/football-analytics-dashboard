@@ -4,8 +4,6 @@ import json
 
 import joblib
 import matplotlib
-
-matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import pandas as pd
 from sklearn.calibration import calibration_curve
@@ -13,10 +11,15 @@ from sklearn.calibration import calibration_curve
 from .config import settings
 from .features_xg import FEATURE_COLUMNS, TARGET_COLUMN
 
+matplotlib.use("Agg")
+
 
 def evaluate_and_plot(n_bins: int = 10) -> dict:
     if not settings.processed_shots_csv.exists():
-        msg = "Processed shots CSV not found. Run `python -m src.cli preprocess`."
+        msg = (
+            "Processed shots CSV not found. "
+            "Run `python -m src.cli preprocess`."
+        )
         raise FileNotFoundError(msg)
 
     if not settings.model_path.exists():

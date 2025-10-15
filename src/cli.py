@@ -20,9 +20,12 @@ app = typer.Typer(add_completion=False, help="Football analytics CLI")
 
 @app.command()
 def fetch(
-    demo: Annotated[bool, typer.Option("--demo", help="Fetch a small demo subset")] = False,
+    demo: Annotated[
+        bool, typer.Option("--demo", help="Fetch a small demo subset")
+    ] = False,
     full: Annotated[
-        bool, typer.Option("--full", help="Fetch many matches (internet required)")
+        bool,
+        typer.Option("--full", help="Fetch many matches (internet required)"),
     ] = False,
 ) -> None:
     """Download match ids and cache passing events."""
@@ -60,11 +63,14 @@ def preprocess() -> None:
 @app.command(name="train")
 def train_cmd(
     model: Annotated[
-        Literal["lr", "xgb"], typer.Option("--model", help="Choose between 'lr' and 'xgb'")
+        Literal["lr", "xgb"],
+        typer.Option("--model", help="Choose between 'lr' and 'xgb'"),
     ] = "xgb",
     calibration: Annotated[
         Literal["isotonic", "platt", "sigmoid"],
-        typer.Option("--calibration", help="Calibration method: isotonic|platt"),
+        typer.Option(
+            "--calibration", help="Calibration method: isotonic|platt"
+        ),
     ] = "isotonic",
 ) -> None:
     try:
@@ -88,7 +94,9 @@ def evaluate() -> None:
 
 
 @app.command()
-def build_passing(match_id: Annotated[int, typer.Argument(help="StatsBomb match id")]) -> None:
+def build_passing(
+    match_id: Annotated[int, typer.Argument(help="StatsBomb match id")]
+) -> None:
     """Build a passing network for a single match and team."""
 
     # Lazy imports to keep CLI startup fast
