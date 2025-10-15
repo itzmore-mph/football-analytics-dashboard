@@ -51,6 +51,21 @@ def plot(fig):
     st.plotly_chart(fig, width="stretch", config={"displayModeBar": False})
 
 
+# LEGACY (catch deprecated kwargs)
+_real_plotly_chart = st.plotly_chart
+_ALLOWED = {"width", "height", "config", "key"}
+
+
+def _guard_plotly_chart(*args, **kwargs):
+    bad = [k for k in kwargs if k not in _ALLOWED]
+    if bad:
+        raise RuntimeError(f"Deprecated kwargs to st.plotly_chart: {bad}")
+    return _real_plotly_chart(*args, **kwargs)
+
+
+st.plotly_chart = _guard_plotly_chart
+
+
 # Cloud bootstrap
 def _artifacts_exist() -> bool:
     return all(
@@ -304,7 +319,7 @@ def run():
         calibration_plot_path = settings.plots_dir / "calibration.png"
         if calibration_plot_path.exists():
             st.subheader("Model Calibration")
-            st.image(str(calibration_plot_path), width="stretch")
+            st.image(str(calibration_plot_path), width='stretch')
             st.caption(
                 "Calibration plot showing predicted xG vs actual goal rate"
             )
