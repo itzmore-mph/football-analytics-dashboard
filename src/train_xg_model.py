@@ -39,9 +39,7 @@ def _split_train_val(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
     else:
         # Ensure at least one group ends up in the validation fold.
         test_size = 0.25 if n_groups > 3 else 1 / n_groups
-        splitter = GroupShuffleSplit(
-            n_splits=1, test_size=test_size, random_state=42
-        )
+        splitter = GroupShuffleSplit(n_splits=1, test_size=test_size, random_state=42)
         idx_tr, idx_va = next(splitter.split(df, groups=groups))
 
     return df.iloc[idx_tr].copy(), df.iloc[idx_va].copy()
@@ -69,15 +67,9 @@ def _build_model(kind: Literal["lr", "xgb"] = "xgb"):
     raise ValueError(msg)
 
 
-def train(
-    kind: Literal["lr", "xgb"] = "xgb",
-    calibration: str = "isotonic"
-) -> dict:
+def train(kind: Literal["lr", "xgb"] = "xgb", calibration: str = "isotonic") -> dict:
     if not settings.processed_shots_csv.exists():
-        msg = (
-            "Processed shots CSV not found. "
-            "Run `python -m src.cli preprocess` first."
-        )
+        msg = "Processed shots CSV not found. " "Run `python -m src.cli preprocess` first."
         raise FileNotFoundError(msg)
 
     df = pd.read_csv(settings.processed_shots_csv)

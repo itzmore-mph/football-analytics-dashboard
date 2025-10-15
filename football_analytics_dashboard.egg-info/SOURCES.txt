@@ -13,7 +13,8 @@ src/features_xg.py
 src/open_data.py
 src/passing_network.py
 src/preprocess_shots.py
-src/train_xg_model.py
+src/sitecustomize.py
+src/train_xG_model.py
 src/utils_io.py
 src/dashboard/__init__.py
 src/dashboard/app.py
