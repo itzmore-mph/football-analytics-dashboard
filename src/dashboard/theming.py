@@ -4,4 +4,7 @@ import streamlit as st
 
 
 def set_theme() -> None:
-    st.set_page_config(page_title="Football Analytics Dashboard", layout="wide")
+    st.set_page_config(
+        page_title="Football Analytics Dashboard",
+        layout="wide"
+    )

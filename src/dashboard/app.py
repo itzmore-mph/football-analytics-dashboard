@@ -203,28 +203,33 @@ def load_model():
 def run() -> None:
     set_theme()
 
-    # Tighter page width & padding
+    # Title + short description
+    st.title("⚽ Football Analytics Dashboard")
+    st.markdown(
+        "This dashboard provides football analytics using "
+        "**Expected Goals (xG)** modeling and passing network analysis."
+    )
+    st.caption("*Statistical analysis powered by StatsBomb Open Data*")
+
+    # Tighter page width & padding (CSS)
     st.markdown(
         """
         <style>
-          .block-container {
+        .block-container {
             max-width: 1200px;
             padding-top: 1rem;
             padding-bottom: 2rem;
-          }
+        }
         </style>
         """,
         unsafe_allow_html=True,
     )
 
-    st.title("⚽ Football Analytics Dashboard")
-    st.markdown("*Statistical analysis powered by StatsBomb Open Data*")
-
     if not _artifacts_exist():
         try:
             ctx = st.container(border=True)  # newer Streamlit
         except TypeError:
-            ctx = st.container()  # older Streamlit fallback
+            ctx = st.container()              # older Streamlit fallback
         with ctx:
             st.info(
                 "No data/model artifacts found yet.\n\n"
@@ -234,27 +239,34 @@ def run() -> None:
             if st.button("Build demo data now"):
                 with st.spinner("Building demo data… "):
                     _ = _build_demo_artifacts()
-                # ⬇️ Clear cached frames so the new CSVs are read on rerun
                 try:
                     load_data.clear()
-                    st.cache_data.clear()  # safe on newer Streamlit
+                    st.cache_data.clear()
                 except Exception:
                     pass
                 st.success("Demo data built. Reloading…")
                 st.rerun()
         st.stop()
 
+    # Sidebar filters and compact layout toggle
     filters = sidebar_filters()
-
-    compact = st.sidebar.toggle(
-        "Compact layout", value=True, help="Smaller plots and tighter layout"
-    )
+    try:
+        compact = st.sidebar.toggle(
+            "Compact layout",
+            value=True,
+            help="Smaller plots and tighter spacing",
+        )
+    except AttributeError:
+        compact = st.sidebar.checkbox(
+            "Compact layout",
+            value=True,
+            help="Smaller plots and tighter spacing",
+        )
 
     shots, passes = load_data()
     model = load_model()
 
     # Sidebar: Competition/Season
-    # Try to use columns from preprocessing; fallback to "(All)"
     comp_col = (
         "competition_name" if "competition_name" in shots.columns else None
     )
@@ -277,7 +289,6 @@ def run() -> None:
         selected_comp = "(All)"
 
     if season_col:
-        # season options depend on competition if one is selected
         season_df = shots.copy()
         if comp_col and selected_comp != "(All)":
             season_df = season_df[season_df[comp_col] == selected_comp]
@@ -300,31 +311,32 @@ def run() -> None:
     # Predict xG for shots
     shots = shots.copy()
 
-    # Guard against missing features after preprocessing changes
     missing = [c for c in FEATURE_COLUMNS if c not in shots.columns]
     if missing:
         st.error(
-            f"Missing feature columns: {missing}. "
-            "Try rebuilding demo data in Settings."
+            (
+                f"Missing feature columns: {missing}. "
+                "Try rebuilding demo data in Settings."
+            )
         )
         st.stop()
 
-    # Guard against unexpected model types
     if not hasattr(model, "predict_proba"):
         st.error(
-            "Loaded model doesn’t support predict_proba(). "
-            "Re-train the model in demo builder."
+            (
+                "Loaded model doesn’t support predict_proba(). "
+                "Re-train the model in demo builder."
+            )
         )
         st.stop()
 
     shots["xg"] = model.predict_proba(shots[FEATURE_COLUMNS].values)[:, 1]
 
-    # Sidebar — Match selection (with friendly labels)
+    # Sidebar — Match selection
     st.sidebar.markdown("---")
     st.sidebar.subheader("Match Selection")
 
     def _match_label(mid: int) -> str:
-        # Prefer persisted fixture + date from preprocessing
         if "fixture" in shots.columns:
             lab = (
                 shots.loc[shots["match_id"] == mid, "fixture"]
@@ -346,7 +358,6 @@ def run() -> None:
                     )
                     return f"{lab[0]} — {md[0]}" if md else lab[0]
                 return lab[0]
-        # Fallback: infer two team names from shots
         teams = (
             shots.loc[shots["match_id"] == mid, "team.name"]
             .dropna()
@@ -381,13 +392,12 @@ def run() -> None:
         help="Pick a match from the filtered set.",
     )
 
-    # Team selector should reflect the filtered set
     teams = shots_filtered.loc[
         shots_filtered["match_id"] == match_id, "team.name"
     ].unique().tolist()
     team = st.sidebar.selectbox("Team (for passing network)", teams, index=0)
 
-    # Filter shots by match and minute range (use filtered base)
+    # Filter shots by match and minute range
     ms = shots_filtered[shots_filtered["match_id"] == match_id]
     minute_min, minute_max = filters["minute_range"]
     ms = ms[(ms["minute"] >= minute_min) & (ms["minute"] <= minute_max)]
@@ -407,13 +417,7 @@ def run() -> None:
         ms = ms[ms["player.name"].isin(selected_players)]
 
     # Tabs
-    (
-        tab_overview,
-        tab_xg_pitch,
-        tab_passing,
-        tab_stats,
-        tab_settings,
-    ) = st.tabs(
+    tab_overview, tab_xg_pitch, tab_passing, tab_stats, tab_settings = st.tabs(
         [
             "📊 Overview",
             "🎯 xG Model & Pitch",
@@ -423,23 +427,21 @@ def run() -> None:
         ]
     )
 
-    # Tab 1: Overview
+    # ───────────────────────── Overview ─────────────────────────
     with tab_overview:
         st.header("Match Overview")
 
-        # ---- Context (competition/season) ----
+        # Context text
         left_meta = []
         if comp_col and selected_comp != "(All)":
             left_meta.append(selected_comp)
         if season_col and selected_season != "(All)":
             left_meta.append(str(selected_season))
         meta_str = (
-            " • ".join(left_meta)
-            if left_meta
-            else "All competitions/seasons"
+            " • ".join(left_meta) if left_meta else "All competitions/seasons"
         )
 
-        # Prefer home/away if present; else first two unique teams
+        # Teams / date
         if {"home_team", "away_team"} <= set(ms.columns):
             h_team = ms["home_team"].dropna().astype(str).head(1).tolist()
             a_team = ms["away_team"].dropna().astype(str).head(1).tolist()
@@ -453,14 +455,12 @@ def run() -> None:
             )
             h_team, a_team = (teams_order + [None, None])[:2]
 
-        # Date (if present)
         match_dt = (
             pd.to_datetime(ms["match_date"].dropna().iloc[0]).date()
             if "match_date" in ms.columns and ms["match_date"].notna().any()
             else None
         )
 
-        # Per-team aggregates
         goals_by_team = (
             ms.groupby("team.name")["is_goal"].sum().astype(int).to_dict()
             if "is_goal" in ms.columns
@@ -472,7 +472,6 @@ def run() -> None:
             else {}
         )
 
-        # Resolve display names
         h = h_team or next(iter(goals_by_team.keys()), "Home")
         a = a_team or (
             list(goals_by_team.keys())[1] if len(goals_by_team) > 1 else "Away"
@@ -483,47 +482,47 @@ def run() -> None:
         h_xg = float(xg_by_team.get(h, 0.0))
         a_xg = float(xg_by_team.get(a, 0.0))
 
-        # --- Centered: teams + big score + caption ---
+        # Centered header block
         center = st.columns([1, 6, 1])[1]
         with center:
             caption = (
-                meta_str if match_dt is None
-                else f"{meta_str} • {match_dt}"
+                meta_str if match_dt is None else f"{meta_str} • {match_dt}"
             )
             st.markdown(
                 f"""
                 <div style="text-align:center;">
-                <div style="font-size:28px; font-weight:700; line-height:1.2; "
-                     "margin-bottom:2px;">
+                  <div style=(
+                      "font-size:28px; font-weight:700; "
+                      "line-height:1.2; margin-bottom:2px;"
+                  )>
                     {h} — {a}
-                </div>
-                <div style="
-                    font-size:44px;
-                    font-weight:900;
-                    line-height:1.0;
-                    color:#e5e7eb;">
+                  </div>
+                  <div style=(
+                      "font-size:44px; font-weight:900; "
+                      "line-height:1.0; color:#e5e7eb;"
+                  )>
                     {h_goals} – {a_goals}
-                </div>
-                <div style="margin-top:6px; opacity:0.8; font-size:14px;">
+                  </div>
+                  <div style="margin-top:6px; opacity:0.8; font-size:14px;">
                     {caption}
-                </div>
+                  </div>
                 </div>
                 """,
                 unsafe_allow_html=True,
             )
 
-        # ---------- Row 1: per-team xG & goals ----------
-        r1c1, r1c2, r1c3, r1c4 = st.columns(4)
-        with r1c1:
+        # Team metrics
+        c1, c2, c3, c4 = st.columns(4)
+        with c1:
             st.metric(f"xG — {h}", f"{h_xg:.2f}")
-        with r1c2:
+        with c2:
             st.metric(f"xG — {a}", f"{a_xg:.2f}")
-        with r1c3:
+        with c3:
             st.metric(f"Goals — {h}", h_goals)
-        with r1c4:
+        with c4:
             st.metric(f"Goals — {a}", a_goals)
 
-        # ---------- Row 2: global context ----------
+        # Global metrics
         total_shots = len(ms)
         avg_xg = (
             float(ms["xg"].mean())
@@ -532,73 +531,70 @@ def run() -> None:
         )
         conv = (
             f"{(100 * ms['is_goal'].sum() / total_shots):.1f}%"
-            if total_shots and "is_goal" in ms.columns else "0%"
+            if total_shots and "is_goal" in ms.columns
+            else "0%"
         )
         shooters = (
             ms["player.name"].nunique() if "player.name" in ms.columns else 0
         )
 
-        r2c1, r2c2, r2c3, r2c4 = st.columns(4)
-        with r2c1:
+        g1, g2, g3, g4 = st.columns(4)
+        with g1:
             st.metric("Total Shots", total_shots)
-        with r2c2:
+        with g2:
             st.metric("Avg xG per Shot", f"{avg_xg:.2f}")
-        with r2c3:
+        with g3:
             st.metric("Conversion %", conv)
-        with r2c4:
+        with g4:
             st.metric("Players with shots", shooters)
 
-        # ----- Timeline -----
+        # Cumulative timeline (compact height)
         st.subheader("Cumulative xG Timeline")
         timeline = cumulative_xg_plot(ms)
-
-        # Make it shorter & tighter in compact mode
         try:
             timeline.update_layout(
                 height=340 if compact else 520,
                 margin=dict(l=20, r=20, t=30, b=40),
-                legend=dict(orientation="h", y=-0.2)
+                legend=dict(orientation="h", y=-0.2),
             )
         except Exception:
             pass
-
         plot(timeline)
 
-        # Data freshness
         st.markdown("---")
         st.caption(
             (
-                f"📅 Data loaded from {len(shots)} total shots across "
-                f"{len(matches)} matches"
+                f"📅 Data loaded from {len(shots)} total shots "
+                f"across {len(matches)} matches"
             )
         )
 
-    # Tab 2: xG Model & Pitch
+    # ───────────────────── xG Model & Pitch ─────────────────────
     with tab_xg_pitch:
         st.header("Shot Map & xG Model")
         st.caption(
-            "• Each dot is a shot. Dot **size** scales with predicted xG "
-            "(chance of scoring).  \n"
-            "• **Colors**: green=goal, yellow=high xG (above slider), "
-            "red=low xG.  \n"
-            "• Use the **xG Threshold** slider to highlight high-probability "
-            "shots."
+            "• Each dot is a shot. "
+            "Dot **size** scales with predicted xG "
+            "(chance of scoring).\n"
+            "• **Colors**: green=goal, "
+            "yellow=high xG (above slider), "
+            "red=low xG.\n"
+            "• Use the **xG Threshold** slider to highlight "
+            "high-probability shots."
         )
 
-        # Model summary (if available)
         model_report_path = settings.models_dir / "model_report.json"
         if model_report_path.exists():
             with open(model_report_path) as f:
                 metrics = json.load(f)
-            col1, col2, col3 = st.columns(3)
-            with col1:
+            m1, m2, m3 = st.columns(3)
+            with m1:
                 st.metric("ROC-AUC", f"{metrics.get('roc_auc', 0):.3f}")
-            with col2:
+            with m2:
                 st.metric("Brier Score", f"{metrics.get('brier', 0):.3f}")
-            with col3:
+            with m3:
                 st.metric("Model", metrics.get("model", "xgb").upper())
 
-        # xG threshold slider
         xg_threshold = st.slider(
             "xG Threshold (highlight shots above this value)",
             min_value=0.0,
@@ -611,19 +607,18 @@ def run() -> None:
             ),
         )
 
-        # Shot map
         st.subheader("Shot Map")
         pitch = Pitch(
             pitch_type="statsbomb",
             pitch_color="#0B132B",
             line_color="#E5E7EB",
         )
-        fig, ax = pitch.draw(figsize=(9, 6) if compact else (12, 8))
+        fig_w, fig_h = (9, 6) if compact else (12, 8)
+        fig, ax = pitch.draw(figsize=(fig_w, fig_h))
 
         for _, r in ms.iterrows():
             base_color = (
-                "#22c55e"
-                if r["is_goal"] == 1
+                "#22c55e" if r["is_goal"] == 1
                 else ("#fbbf24" if r["xg"] >= xg_threshold else "#ef4444")
             )
             color = (
@@ -645,9 +640,7 @@ def run() -> None:
                 linewidth=0.5,
             )
 
-        # Legend
         from matplotlib.patches import Patch
-
         legend_elements = [
             Patch(facecolor="#22c55e", label="Goal"),
             Patch(facecolor="#fbbf24", label=f"High xG (≥{xg_threshold})"),
@@ -660,19 +653,16 @@ def run() -> None:
             "(origin at top-left)."
         )
 
-        # Calibration plot (if available)
         calibration_plot_path = settings.plots_dir / "calibration.png"
         if calibration_plot_path.exists():
             st.subheader("Model Calibration")
             st.image(str(calibration_plot_path), use_column_width=True)
             st.caption(
-                "Calibration plot showing predicted xG "
-                "vs actual goal rate"
+                "Calibration plot showing predicted xG vs "
+                "actual goal rate"
             )
 
-    # -----------------------------------------------------------------
-    # Tab 3: Passing Network
-    # -----------------------------------------------------------------
+    # ───────────────────── Passing Network ─────────────────────
     with tab_passing:
         from src.passing_network import build_team_network
 
@@ -685,16 +675,16 @@ def run() -> None:
             min_edge=filters["pass_threshold"],
         )
 
-        col1, col2, col3 = st.columns(3)
-        with col1:
+        c1, c2, c3 = st.columns(3)
+        with c1:
             st.metric("Players", len(net.nodes))
-        with col2:
+        with c2:
             st.metric("Passing Connections", len(net.edges))
-        with col3:
-            st.metric(
-                "Max Passes",
-                int(net.edges["count"].max()) if not net.edges.empty else 0,
+        with c3:
+            max_passes = (
+                int(net.edges["count"].max()) if not net.edges.empty else 0
             )
+            st.metric("Max Passes", max_passes)
 
         if net.edges.empty:
             st.info(
@@ -707,11 +697,11 @@ def run() -> None:
                 pitch_color="#0B132B",
                 line_color="#E5E7EB",
             )
-            fig2, ax2 = pitch.draw(figsize=(9, 6) if compact else (12, 8))
+            pn_w, pn_h = (9, 6) if compact else (12, 8)
+            fig2, ax2 = pitch.draw(figsize=(pn_w, pn_h))
 
             edge_scale = max(1.0, float(net.edges["count"].max() or 0))
 
-            # Ensure player_name column exists for labeling
             if "player_name" not in net.nodes.columns:
                 if "player" in net.nodes.columns:
                     net.nodes["player_name"] = net.nodes["player"].astype(str)
@@ -722,18 +712,17 @@ def run() -> None:
                 if not isinstance(value, str) or not value:
                     return ""
                 s = value.strip()
-                if not any(ch.isalpha() for ch in s):  # numeric-like id
+                if not any(ch.isalpha() for ch in s):
                     return s
                 return s.split()[-1]
 
-            # Draw edges
             for _, e in net.edges.iterrows():
                 src = net.nodes[net.nodes["player"] == e["source"]][
                     ["x_mean", "y_mean"]
                 ].mean()
-                dst = net.nodes[net.nodes["player"] == e["target"]][
-                    ["x_mean", "y_mean"]
-                ].mean()
+                dst = net.nodes[
+                    net.nodes["player"] == e["target"]
+                ][["x_mean", "y_mean"]].mean()
                 if pd.isna(src["x_mean"]) or pd.isna(dst["x_mean"]):
                     continue
                 lw = 0.5 + (e["count"] / edge_scale) * 5
@@ -749,7 +738,6 @@ def run() -> None:
                     color="#94a3b8",
                 )
 
-            # Draw nodes (highlight selected players if any)
             for _, n in net.nodes.iterrows():
                 node_color = (
                     "#22c55e"
@@ -782,23 +770,18 @@ def run() -> None:
 
             st.pyplot(fig2, clear_figure=True)
 
-    # -----------------------------------------------------------------
-    # Tab 4: Statistics
-    # -----------------------------------------------------------------
+    # ───────────────────── Statistics ─────────────────────
     with tab_stats:
         st.header("Statistics")
 
-        # Team-level stats
         st.subheader("Team Statistics")
         team_stats = (
             ms.groupby("team.name")
-            .agg(
-                {
-                    "xg": ["sum", "mean"],
-                    "is_goal": ["sum", "count"],
-                    "shot_distance": "mean",
-                }
-            )
+            .agg({
+                "xg": ["sum", "mean"],
+                "is_goal": ["sum", "count"],
+                "shot_distance": "mean",
+            })
             .round(2)
         )
         team_stats.columns = [
@@ -810,7 +793,6 @@ def run() -> None:
         ]
         _df_full_width(team_stats)
 
-        # Player-level stats
         st.subheader("Top Players by xG")
         if "player.name" in ms.columns:
             player_stats = (
@@ -823,7 +805,6 @@ def run() -> None:
             player_stats.columns = ["Total xG", "Goals", "Avg Distance"]
             _df_full_width(player_stats)
 
-        # Export shots
         st.subheader("Export Data")
         csv = ms.to_csv(index=False).encode("utf-8")
         st.download_button(
@@ -833,21 +814,19 @@ def run() -> None:
             mime="text/csv",
         )
 
-    # -----------------------------------------------------------------
-    # Tab 5: Settings
-    # -----------------------------------------------------------------
+    # ───────────────────── Settings / Data Fetch ─────────────────────
     with tab_settings:
         st.header("Settings")
 
         st.subheader("Cache Management")
         st.markdown("Clear cached data to force a refresh from source.")
-        col1, col2 = st.columns(2)
-        with col1:
+        c1, c2 = st.columns(2)
+        with c1:
             if st.button("🔄 Clear Data Cache"):
                 load_data.clear()
                 st.success("Data cache cleared!")
                 st.rerun()
-        with col2:
+        with c2:
             if st.button("🔄 Clear Model Cache"):
                 load_model.clear()
                 st.success("Model cache cleared!")
@@ -857,15 +836,13 @@ def run() -> None:
         st.subheader("Data Source")
         st.markdown("**StatsBomb Open Data**")
         st.markdown(
-            "Data is fetched from: "
-            "https://github.com/statsbomb/open-data"
+            "Data is fetched from: https://github.com/statsbomb/open-data"
         )
 
-        # Add matches by competition/season (targeted)
         st.subheader("Add matches by competition / season")
         with st.form("add_by_comp_season"):
-            col1, col2, col3 = st.columns([2, 2, 1])
-            with col1:
+            c1, c2, c3 = st.columns([2, 2, 1])
+            with c1:
                 comp_options = sorted(
                     _list_competitions_df()["competition_name"]
                     .dropna()
@@ -873,20 +850,18 @@ def run() -> None:
                     .tolist()
                 )
                 default_idx = (
-                    comp_options.index("NWSL")
-                    if "NWSL" in comp_options
-                    else 0
+                    comp_options.index("NWSL") if "NWSL" in comp_options else 0
                 )
                 comp_name = st.selectbox(
                     "Competition", comp_options, index=default_idx
                 )
-            with col2:
+            with c2:
                 season_opts = ["(latest)"] + _list_seasons_for_comp(comp_name)
                 season_choice = st.selectbox("Season", season_opts, index=0)
                 season_name = (
                     None if season_choice == "(latest)" else season_choice
                 )
-            with col3:
+            with c3:
                 n_comp = st.number_input(
                     "How many matches",
                     min_value=4,
@@ -900,7 +875,6 @@ def run() -> None:
             from src.open_data import collect_matches_by_name
             from src.passing_network import build_and_save_passing_events
             from src.preprocess_shots import build_processed_shots
-
             try:
                 with st.spinner("Fetching matches & building artifacts..."):
                     mids = collect_matches_by_name(
@@ -916,8 +890,10 @@ def run() -> None:
                 except Exception:
                     pass
                 st.success(
-                    f"Added/updated {len(mids)} matches from {comp_name} "
-                    f"{season_name or ''}. Reloading…"
+                    (
+                        f"Added/updated {len(mids)} matches from {comp_name} "
+                        f"{season_name or ''}. Reloading…"
+                    )
                 )
                 st.rerun()
             except Exception as e:
@@ -925,11 +901,10 @@ def run() -> None:
 
         st.markdown("---")
         st.subheader("About")
-        # Cleaned up stray parentheses/quotes so the copy renders nicely
         st.markdown(
             """
-            This dashboard provides football analytics using
-            **Expected Goals (xG)**
+            "This dashboard provides football analytics using "
+            "**Expected Goals (xG)**"
             modeling and passing network analysis.
 
             **Features**
@@ -942,6 +917,6 @@ def run() -> None:
 
         st.markdown("---")
         st.info(
-            "💡 **Tip:** Use the sidebar filters to adjust minute range "
-            "and passing thresholds."
+            "💡 **Tip:** Use the sidebar filters to adjust minute range and "
+            "passing thresholds."
         )

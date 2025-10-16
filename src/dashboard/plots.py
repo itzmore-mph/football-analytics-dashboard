@@ -42,6 +42,12 @@ def cumulative_xg_plot(df: pd.DataFrame) -> go.Figure:
         xaxis_title="Minute",
         yaxis_title="Cumulative xG",
         hovermode="x unified",
-        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+        legend=dict(
+            orientation="h",
+            yanchor="bottom",
+            y=1.02,
+            xanchor="right",
+            x=1,
+        ),
     )
     return fig
