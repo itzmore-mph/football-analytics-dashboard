@@ -10,7 +10,7 @@ from mplsoccer import Pitch
 
 # Absolute imports (cloud-safe)
 from src.config import settings
-from src.dashboard.components import metric_badge, sidebar_filters
+from src.dashboard.components import sidebar_filters
 from src.dashboard.plots import cumulative_xg_plot
 from src.dashboard.theming import set_theme
 from src.features_xg import FEATURE_COLUMNS
@@ -408,7 +408,7 @@ def run() -> None:
     with tab_overview:
         st.header("Match Overview")
 
-        # ----- Context (competition/season) -----
+        # ---- Context (competition/season) ----
         left_meta = []
         if comp_col and selected_comp != "(All)":
             left_meta.append(selected_comp)
@@ -420,34 +420,42 @@ def run() -> None:
             else "All competitions/seasons"
         )
 
-        # ----- Teams & scoreline -----
-        # Prefer home/away columns if present
-        if "home_team" in ms.columns and "away_team" in ms.columns:
-            home_team = ms["home_team"].dropna().astype(str).head(1).tolist()
-            away_team = ms["away_team"].dropna().astype(str).head(1).tolist()
-            home_team = home_team[0] if home_team else None
-            away_team = away_team[0] if away_team else None
+        # Prefer home/away if present; else first two unique teams
+        if {"home_team", "away_team"} <= set(ms.columns):
+            h_team = ms["home_team"].dropna().astype(str).head(1).tolist()
+            a_team = ms["away_team"].dropna().astype(str).head(1).tolist()
+            h_team = h_team[0] if h_team else None
+            a_team = a_team[0] if a_team else None
         else:
-            # Fallback: first two unique team names
-            teams_order = ms["team.name"].dropna().unique().tolist()
-            home_team, away_team = (teams_order + [None, None])[:2]
+            teams_order = (
+                ms["team.name"].dropna().unique().tolist()
+                if "team.name" in ms.columns
+                else []
+            )
+            h_team, a_team = (teams_order + [None, None])[:2]
 
-        # Goals by team
+        # Date (if present)
+        match_dt = (
+            pd.to_datetime(ms["match_date"].dropna().iloc[0]).date()
+            if "match_date" in ms.columns and ms["match_date"].notna().any()
+            else None
+        )
+
+        # Per-team aggregates
         goals_by_team = (
             ms.groupby("team.name")["is_goal"].sum().astype(int).to_dict()
-            if "team.name" in ms.columns and "is_goal" in ms.columns
+            if "is_goal" in ms.columns
             else {}
         )
-        # xG by team
         xg_by_team = (
             ms.groupby("team.name")["xg"].sum().round(2).to_dict()
-            if "team.name" in ms.columns and "xg" in ms.columns
+            if "xg" in ms.columns
             else {}
         )
 
-        # Resolve names for display
-        h = home_team or next(iter(goals_by_team.keys()), "Home")
-        a = away_team or (
+        # Resolve display names
+        h = h_team or next(iter(goals_by_team.keys()), "Home")
+        a = a_team or (
             list(goals_by_team.keys())[1] if len(goals_by_team) > 1 else "Away"
         )
 
@@ -456,51 +464,53 @@ def run() -> None:
         h_xg = float(xg_by_team.get(h, 0.0))
         a_xg = float(xg_by_team.get(a, 0.0))
 
-        # Centered scoreline header
+        # Centered scoreline
         sc1, sc2, sc3 = st.columns([1, 2, 1])
         with sc2:
             st.markdown(f"### **{h} {h_goals} – {a_goals} {a}**")
-            st.caption(meta_str)
-
-        # ----- Aligned metrics row -----
-        m1, m2, m3, m4 = st.columns(4)
-        with m1:
-            metric_badge(f"xG — {h}", h_xg)
-        with m2:
-            metric_badge(f"xG — {a}", a_xg)
-        with m3:
-            st.metric(
-                "Goals",
-                int(ms["is_goal"].sum()) if "is_goal" in ms.columns else 0,
+            caption = (
+                meta_str if match_dt is None
+                else f"{meta_str} • {match_dt}"
             )
-        with m4:
-            st.metric("Total Shots", len(ms))
+            st.caption(caption)
 
-        # Secondary metrics (optional)
-        sm1, sm2, sm3 = st.columns(3)
-        with sm1:
-            avg_xg = (
-                float(ms["xg"].mean())
-                if "xg" in ms.columns and len(ms)
-                else 0.0
-            )
+        # ---------- Row 1: per-team xG & goals ----------
+        r1c1, r1c2, r1c3, r1c4 = st.columns(4)
+        with r1c1:
+            st.metric(f"xG — {h}", f"{h_xg:.2f}")
+        with r1c2:
+            st.metric(f"xG — {a}", f"{a_xg:.2f}")
+        with r1c3:
+            st.metric(f"Goals — {h}", h_goals)
+        with r1c4:
+            st.metric(f"Goals — {a}", a_goals)
+
+        # ---------- Row 2: global context ----------
+        total_shots = len(ms)
+        avg_xg = (
+            float(ms["xg"].mean())
+            if "xg" in ms.columns and total_shots
+            else 0.0
+        )
+        conv = (
+            f"{(100 * ms['is_goal'].sum() / total_shots):.1f}%"
+            if total_shots and "is_goal" in ms.columns else "0%"
+        )
+        shooters = (
+            ms["player.name"].nunique() if "player.name" in ms.columns else 0
+        )
+
+        r2c1, r2c2, r2c3, r2c4 = st.columns(4)
+        with r2c1:
+            st.metric("Total Shots", total_shots)
+        with r2c2:
             st.metric("Avg xG per Shot", f"{avg_xg:.2f}")
-        with sm2:
-            conv = (
-                f"{(100 * ms['is_goal'].sum() / len(ms)):.1f}%"
-                if len(ms) and "is_goal" in ms.columns
-                else "0%"
-            )
+        with r2c3:
             st.metric("Conversion %", conv)
-        with sm3:
-            st.metric(
-                "Players with shots",
-                ms["player.name"].nunique()
-                if "player.name" in ms.columns
-                else 0,
-            )
+        with r2c4:
+            st.metric("Players with shots", shooters)
 
-        # ----- Cumulative xG timeline -----
+        # ----- Timeline -----
         st.subheader("Cumulative xG Timeline")
         timeline = cumulative_xg_plot(ms)
         plot(timeline)
