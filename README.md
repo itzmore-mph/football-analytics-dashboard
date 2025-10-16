@@ -59,6 +59,7 @@ make demo      # Run full demo pipeline (fetch → train → evaluate)
 ## ✨ Features
 
 ### 📊 Multi-Tab Dashboard
+
 Professional Streamlit interface with 5 dedicated tabs:
 
 1. **📊 Overview Tab**
@@ -93,6 +94,7 @@ Professional Streamlit interface with 5 dedicated tabs:
    - About section with feature descriptions
 
 ### 🧠 xG Modeling
+
 - **Models**: Logistic Regression baseline + XGBoost classifier
 - **Calibration**: Isotonic regression / Platt (sigmoid) scaling
 - **Features**: Distance, angle, body part, pressure, set-piece indicator
@@ -101,6 +103,7 @@ Professional Streamlit interface with 5 dedicated tabs:
 - **Plots**: Calibration curve saved to `models/plots/calibration.png`
 
 ### 🕸️ Passing Networks
+
 - Average player positions from pass start/end locations
 - Edges filtered by minimum pass count (configurable)
 - Degree centrality calculation with NetworkX
@@ -136,33 +139,43 @@ python -m src.cli build-passing <match_id>
 ## 📊 Dashboard Screenshots
 
 ### Overview Tab
+
 *Match overview with xG metrics and cumulative timeline*
+
 - Team xG comparison
 - Shot statistics (total shots, goals, conversion %)
 - Interactive timeline showing xG accumulation over match minutes
 
 ### xG Model & Pitch Tab
+
 *Shot map with xG-based color coding and model calibration*
+
 - Model performance metrics displayed
 - Adjustable xG threshold slider
 - Color-coded shots: 🟢 Goals | 🟡 High xG | 🔴 Low xG
 - Model calibration curve
 
 ### Passing Network Tab
+
 *Team passing connections visualized on pitch*
+
 - Player positions from average locations
 - Edge thickness proportional to pass count
 - Adjustable minimum pass filter
 - Network statistics
 
 ### Statistics Tab
+
 *Detailed team and player statistics*
+
 - Team aggregates (total xG, average per shot, goals, shots)
 - Top 10 players by xG
 - Export to CSV functionality
 
 ### Settings Tab
+
 *Configuration and cache management*
+
 - Clear data/model caches
 - Data source information
 - Feature documentation
@@ -235,6 +248,7 @@ pytest tests/ --cov=src --cov-report=html
 ```
 
 Tests included:
+
 - Feature engineering validation
 - Data preprocessing
 - CLI imports
@@ -254,6 +268,7 @@ make format
 ```
 
 Tools configured:
+
 - **ruff**: Fast linter (replaces flake8, pylint)
 - **black**: Code formatter
 - **isort**: Import sorter
@@ -262,12 +277,14 @@ Tools configured:
 ## 🐛 Known Limitations & Future Enhancements
 
 **Current Limitations:**
+
 - Demo dataset is small (4 matches) for quick testing
 - No player tracking/event data beyond shots and passes
 - Model trained on limited feature set (no shot type, assist context)
 - Passing networks use simple average positions (not phase-specific)
 
 **Potential Enhancements:**
+
 - Add possession-adjusted metrics
 - Include defensive actions (tackles, interceptions)
 - Multi-match aggregation views
@@ -295,7 +312,7 @@ Tools configured:
 
 ## 📁 Project Structure
 
-```
+```plaintext
 football-analytics-dashboard/
 ├── src/
 │   ├── config.py              # Configuration and paths
@@ -331,6 +348,7 @@ football-analytics-dashboard/
 ## 🎓 Technical Details
 
 ### xG Model Architecture
+
 - **Base Models**: Logistic Regression | XGBoost Classifier
 - **Hyperparameters**: 300 trees, max_depth=4, learning_rate=0.05
 - **Cross-Validation**: 3-5 fold GroupKFold by match_id
@@ -338,6 +356,7 @@ football-analytics-dashboard/
 - **Features**: 8 engineered features (distance, angle, body part, pressure, time, set-piece)
 
 ### Data Processing Pipeline
+
 1. **Fetch**: Download StatsBomb events from GitHub
 2. **Extract**: Parse shots and passes from event data
 3. **Engineer**: Build shot features (geometry, context)
@@ -346,6 +365,7 @@ football-analytics-dashboard/
 6. **Serve**: Load trained model in Streamlit for inference
 
 ### Passing Network Methodology
+
 - **Nodes**: Players with average (x,y) from pass starts and receptions
 - **Edges**: Directed edges weighted by completed pass count
 - **Filtering**: Minimum pass threshold (default: 3)
@@ -375,7 +395,8 @@ Contributions are welcome! Please follow these steps:
 ## 📬 Contact
 
 **👨‍💻 Moritz Philipp Haaf, BSc MA**  
-**📩 Email:** [itzmore.dev@gmail.com](mailto:itzmore.dev@gmail.com)  
+**📩 Email:** [itzmore.dev@gmail.com](mailto:itzmore.dev@gmail.com)
+**🔗 Portfolio Website:** [https://itzmore.dev](https://itzmore.dev)  
 **🔗 GitHub:** [https://github.com/itzmore-mph](https://github.com/itzmore-mph)  
 **🔗 LinkedIn:** [https://linkedin.com/in/moritz-philipp-haaf/](https://linkedin.com/in/moritz-philipp-haaf/)  
 
