@@ -2,11 +2,12 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from functools import lru_cache
 
 import pandas as pd
 from tqdm import tqdm
 
-from .config import settings
+from .config import settings  # noqa: F401  # kept for consistency/forward use
 from .utils_io import read_remote_json
 
 RAW_BASE = "https://raw.githubusercontent.com/statsbomb/open-data/master/data"
@@ -16,11 +17,10 @@ RAW_BASE = "https://raw.githubusercontent.com/statsbomb/open-data/master/data"
 # Low-level fetchers
 # ──────────────────────────────────────────────────────────────────────────────
 
-
 def competitions() -> pd.DataFrame:
     """
     Return the StatsBomb competitions catalog.
-    Columns: competition_id, competition_name, season_id, season_name
+    Columns (typical): competition_id, competition_name, season_id, season_name
     """
     data = read_remote_json(f"{RAW_BASE}/competitions.json")
     return pd.DataFrame(data)
@@ -29,6 +29,7 @@ def competitions() -> pd.DataFrame:
 def seasons_for(comp_id: int) -> pd.DataFrame:
     """
     Return seasons for a given competition id.
+    Columns: competition_id, season_id, season_name
     """
     df = competitions()
     cols = ["competition_id", "season_id", "season_name"]
@@ -69,8 +70,85 @@ def events(match_id: int) -> pd.DataFrame:
     return pd.json_normalize(data, sep=".")
 
 
-# Demo sampling (small, fast)
+# ──────────────────────────────────────────────────────────────────────────────
+# Cached match index + metadata lookup
+# ──────────────────────────────────────────────────────────────────────────────
 
+@lru_cache(maxsize=1)
+def _match_index() -> pd.DataFrame:
+    """
+    Build a cached index of all matches with their competition/season names.
+    Columns:
+      match_id, competition_id, season_id, competition_name, season_name,
+      home_team, away_team, match_date
+    """
+    dfc = competitions()
+    rows: list[pd.DataFrame] = []
+
+    for _, r in dfc.iterrows():
+        try:
+            mdf = matches(int(r.competition_id), int(r.season_id))
+        except Exception:
+            # Skip pairs without available matches or transient fetch errors
+            continue
+
+        if mdf is None or mdf.empty:
+            continue
+
+        # Ensure essential columns exist
+        keep = ["match_id", "home_team", "away_team", "match_date"]
+        for c in keep:
+            if c not in mdf.columns:
+                mdf[c] = pd.NA
+
+        tmp = mdf[keep].copy()
+        tmp["competition_id"] = int(r.competition_id)
+        tmp["season_id"] = int(r.season_id)
+        tmp["competition_name"] = r.competition_name
+        tmp["season_name"] = r.season_name
+        rows.append(tmp)
+
+    if not rows:
+        return pd.DataFrame(
+            columns=[
+                "match_id",
+                "home_team",
+                "away_team",
+                "match_date",
+                "competition_id",
+                "season_id",
+                "competition_name",
+                "season_name",
+            ]
+        )
+
+    # Concatenate and de-duplicate just in case
+    out = pd.concat(rows, ignore_index=True)
+    out = out.drop_duplicates(subset=["match_id"])
+    return out
+
+
+def match_meta(match_id: int) -> dict:
+    """
+    Return metadata for a match_id:
+
+    {
+      'competition_name', 'season_name', 'competition_id', 'season_id',
+      'home_team', 'away_team', 'match_date', 'match_id'
+    }
+
+    Returns {} if not found.
+    """
+    idx = _match_index()
+    row = idx[idx["match_id"] == match_id]
+    if row.empty:
+        return {}
+    return row.iloc[0].to_dict()
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Demo sampling (small, fast)
+# ──────────────────────────────────────────────────────────────────────────────
 
 @dataclass(frozen=True)
 class DemoPlan:
@@ -103,13 +181,15 @@ def collect_demo_matches(plan: DemoPlan | None = None) -> list[int]:
     return m_ids
 
 
+# ──────────────────────────────────────────────────────────────────────────────
 # Scalable collectors
-
+# ──────────────────────────────────────────────────────────────────────────────
 
 def collect_full_matches(limit: int | None = None) -> list[int]:
     """
     Collect up to `limit` match_ids across all competitions/seasons listed
     by StatsBomb.
+
     Order is the order provided by the competitions catalog (then matches).
     Useful for your 'Build more data' button.
 
@@ -150,21 +230,4 @@ def collect_matches_by_name(
         raise ValueError(f"Competition not found: {competition_name!r}")
 
     if season_name:
-        cdf = cdf[cdf["season_name"] == season_name]
-        if cdf.empty:
-            raise ValueError(
-                f"Season {season_name!r} not found for competition "
-                f"{competition_name!r}"
-            )
-
-    # Choose the latest season if not specified
-    cdf = cdf.sort_values("season_name", ascending=False)
-    comp_id = int(cdf.iloc[0]["competition_id"])
-    season_id = int(cdf.iloc[0]["season_id"])
-
-    mdf = matches(comp_id, season_id)
-    if sort_by_date and "match_date" in mdf.columns:
-        mdf = mdf.sort_values("match_date", ascending=ascending)
-
-    mids = mdf["match_id"].dropna().astype(int).tolist()
-    return mids if limit is None else mids[:limit]
+        cdf

@@ -47,7 +47,6 @@ except Exception:
 
 
 # Streamlit compatibility helpers (work across versions)
-
 def _df_full_width(df: pd.DataFrame, **kwargs):
     """
     Prefer new API (width='stretch');
@@ -75,8 +74,8 @@ def _plotly_full_width(fig, **kwargs):
             fig,
             use_container_width=True,
             config=cfg,
-            **kwargs
-            )
+            **kwargs,
+        )
 
 
 @cache_data(show_spinner=False)
@@ -140,6 +139,39 @@ def _build_demo_artifacts() -> dict:
     return {"matches": mids, "metrics": metrics}
 
 
+def _scoreline_for_match(ms: pd.DataFrame) -> str:
+    """
+    Compute scoreline by summing is_goal per team for the selected match
+    frame.
+    """
+    if (
+        ms.empty
+        or "team.name" not in ms.columns
+        or "is_goal" not in ms.columns
+    ):
+        return ""
+    goals = (
+        ms.groupby("team.name")["is_goal"]
+        .sum()
+        .astype(int)
+        .sort_index()
+        .to_dict()
+    )
+    teams = list(goals.keys())
+    if len(teams) < 2:
+        return ""
+    # Prefer a stable home/away ordering if present
+    home_team, away_team = teams[0], teams[1]
+    if "home_team" in ms.columns and "away_team" in ms.columns:
+        h = ms["home_team"].dropna().astype(str).head(1).tolist()
+        a = ms["away_team"].dropna().astype(str).head(1).tolist()
+        if h and a:
+            home_team, away_team = h[0], a[0]
+    h_goals = int(goals.get(home_team, 0))
+    a_goals = int(goals.get(away_team, 0))
+    return f"{home_team} {h_goals} – {a_goals} {away_team}"
+
+
 # ---------------------------------------------------------------------
 # Data/model loaders
 # ---------------------------------------------------------------------
@@ -177,7 +209,7 @@ def run() -> None:
         try:
             ctx = st.container(border=True)  # newer Streamlit
         except TypeError:
-            ctx = st.container()              # older Streamlit fallback
+            ctx = st.container()  # older Streamlit fallback
         with ctx:
             st.info(
                 "No data/model artifacts found yet.\n\n"
@@ -190,7 +222,7 @@ def run() -> None:
                 # ⬇️ Clear cached frames so the new CSVs are read on rerun
                 try:
                     load_data.clear()
-                    st.cache_data.clear()   # safe on newer Streamlit
+                    st.cache_data.clear()  # safe on newer Streamlit
                 except Exception:
                     pass
                 st.success("Demo data built. Reloading…")
@@ -201,6 +233,47 @@ def run() -> None:
 
     shots, passes = load_data()
     model = load_model()
+
+    # Sidebar: Competition/Season
+    # Try to use columns from preprocessing; fallback to "(All)"
+    comp_col = (
+        "competition_name" if "competition_name" in shots.columns else None
+    )
+    season_col = "season_name" if "season_name" in shots.columns else None
+
+    st.sidebar.markdown("---")
+    st.sidebar.subheader("Filters")
+
+    if comp_col:
+        comp_options = ["(All)"] + sorted(
+            shots[comp_col].dropna().unique().tolist()
+        )
+        selected_comp = st.sidebar.selectbox(
+            "Competition",
+            comp_options,
+            index=0,
+            help="Filter matches by competition (from StatsBomb Open Data).",
+        )
+    else:
+        selected_comp = "(All)"
+
+    if season_col:
+        # season options depend on competition if one is selected
+        season_df = shots.copy()
+        if comp_col and selected_comp != "(All)":
+            season_df = season_df[season_df[comp_col] == selected_comp]
+        season_options = ["(All)"] + sorted(
+            season_df[season_col].dropna().unique().tolist()
+        )
+        selected_season = st.sidebar.selectbox(
+            "Season",
+            season_options,
+            index=0,
+            help="Filter matches by season.",
+        )
+    else:
+        selected_season = "(All)"
+
     if shots.empty or passes.empty or model is None:
         st.warning("Artifacts missing. Please click **Build demo data now**")
         st.stop()
@@ -264,15 +337,39 @@ def run() -> None:
         vs = " vs ".join(teams[:2]) if teams else f"Match {mid}"
         return f"{vs} — {mid}"
 
-    matches = sorted(shots["match_id"].unique().tolist())
-    match_id = st.sidebar.selectbox("Match", matches, format_func=_match_label)
-    teams = shots.loc[
-        shots["match_id"] == match_id, "team.name"
+    # Apply comp/season filters to available matches
+    shots_filtered = shots.copy()
+    if comp_col and selected_comp != "(All)":
+        shots_filtered = shots_filtered[
+            shots_filtered[comp_col] == selected_comp
+        ]
+    if season_col and selected_season != "(All)":
+        shots_filtered = shots_filtered[
+            shots_filtered[season_col] == selected_season
+        ]
+
+    matches = sorted(shots_filtered["match_id"].unique().tolist())
+    if not matches:
+        st.sidebar.warning(
+            "No matches for current Competition/Season filters."
+        )
+        st.stop()
+
+    match_id = st.sidebar.selectbox(
+        "Match",
+        matches,
+        format_func=_match_label,
+        help="Pick a match from the filtered set.",
+    )
+
+    # Team selector should reflect the filtered set
+    teams = shots_filtered.loc[
+        shots_filtered["match_id"] == match_id, "team.name"
     ].unique().tolist()
     team = st.sidebar.selectbox("Team (for passing network)", teams, index=0)
 
-    # Filter shots by match and minute range
-    ms = shots[shots["match_id"] == match_id]
+    # Filter shots by match and minute range (use filtered base)
+    ms = shots_filtered[shots_filtered["match_id"] == match_id]
     minute_min, minute_max = filters["minute_range"]
     ms = ms[(ms["minute"] >= minute_min) & (ms["minute"] <= minute_max)]
 
@@ -308,9 +405,24 @@ def run() -> None:
     )
 
     # Tab 1: Overview
-
     with tab_overview:
         st.header("Match Overview")
+        left_meta = []
+        if comp_col and selected_comp != "(All)":
+            left_meta.append(selected_comp)
+        if season_col and selected_season != "(All)":
+            left_meta.append(str(selected_season))
+        meta_str = (
+            " • ".join(left_meta)
+            if left_meta
+            else "All competitions/seasons"
+        )
+
+        scoreline = _scoreline_for_match(ms)
+        if scoreline:
+            st.markdown(f"**{scoreline}**  \n_{meta_str}_")
+        else:
+            st.caption(meta_str)
 
         # Team xG metrics
         team_xg = ms.groupby("team.name")["xg"].sum().round(2)
@@ -349,9 +461,16 @@ def run() -> None:
         )
 
     # Tab 2: xG Model & Pitch
-
     with tab_xg_pitch:
         st.header("Shot Map & xG Model")
+        st.caption(
+            "• Each dot is a shot. Dot **size** scales with predicted xG "
+            "(chance of scoring).  \n"
+            "• **Colors**: green=goal, yellow=high xG (above slider), "
+            "red=low xG.  \n"
+            "• Use the **xG Threshold** slider to highlight high-probability "
+            "shots."
+        )
 
         # Model summary (if available)
         model_report_path = settings.models_dir / "model_report.json"
@@ -373,6 +492,10 @@ def run() -> None:
             max_value=1.0,
             value=0.3,
             step=0.05,
+            help=(
+                "Shots with predicted xG ≥ this value are highlighted in "
+                "yellow."
+            ),
         )
 
         # Shot map
@@ -419,16 +542,19 @@ def run() -> None:
         ]
         ax.legend(handles=legend_elements, loc="upper left", framealpha=0.8)
         st.pyplot(fig, clear_figure=True)
+        st.caption(
+            "Shot locations use StatsBomb coordinates "
+            "(origin at top-left)."
+        )
 
         # Calibration plot (if available)
         calibration_plot_path = settings.plots_dir / "calibration.png"
         if calibration_plot_path.exists():
             st.subheader("Model Calibration")
-            # st.image doesn't support string widths on older versions
-            # Use column width so it scales nicely in both old/new versions
             st.image(str(calibration_plot_path), use_column_width=True)
             st.caption(
-                "Calibration plot showing predicted xG vs actual goal rate"
+                "Calibration plot showing predicted xG "
+                "vs actual goal rate"
             )
 
     # -----------------------------------------------------------------
@@ -618,7 +744,8 @@ def run() -> None:
         st.subheader("Data Source")
         st.markdown("**StatsBomb Open Data**")
         st.markdown(
-            "Data is fetched from: https://github.com/statsbomb/open-data"
+            "Data is fetched from: "
+            "https://github.com/statsbomb/open-data"
         )
 
         # Add matches by competition/season (targeted)
@@ -633,7 +760,9 @@ def run() -> None:
                     .tolist()
                 )
                 default_idx = (
-                    comp_options.index("NWSL") if "NWSL" in comp_options else 0
+                    comp_options.index("NWSL")
+                    if "NWSL" in comp_options
+                    else 0
                 )
                 comp_name = st.selectbox(
                     "Competition", comp_options, index=default_idx
