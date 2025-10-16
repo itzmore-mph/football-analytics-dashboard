@@ -202,6 +202,21 @@ def load_model():
 # ---------------------------------------------------------------------
 def run() -> None:
     set_theme()
+
+    # Tighter page width & padding
+    st.markdown(
+        """
+        <style>
+          .block-container {
+            max-width: 1200px;
+            padding-top: 1rem;
+            padding-bottom: 2rem;
+          }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
     st.title("⚽ Football Analytics Dashboard")
     st.markdown("*Statistical analysis powered by StatsBomb Open Data*")
 
@@ -230,6 +245,10 @@ def run() -> None:
         st.stop()
 
     filters = sidebar_filters()
+
+    compact = st.sidebar.toggle(
+        "Compact layout", value=True, help="Smaller plots and tighter layout"
+    )
 
     shots, passes = load_data()
     model = load_model()
@@ -464,26 +483,34 @@ def run() -> None:
         h_xg = float(xg_by_team.get(h, 0.0))
         a_xg = float(xg_by_team.get(a, 0.0))
 
-        # Centered scoreline
-        sc1, sc2, sc3 = st.columns([1, 2, 1])
-        with sc2:
-            # Line 1: teams
-            st.markdown(f"### {h} — {a}")
-            # Line 2: big score with accent color (good contrast on dark theme)
+        # --- Centered: teams + big score + caption ---
+        center = st.columns([1, 6, 1])[1]
+        with center:
+            caption = (
+                meta_str if match_dt is None
+                else f"{meta_str} • {match_dt}"
+            )
             st.markdown(
-                (
-                    f"<div style='text-align:center; font-size:44px; "
-                    f"font-weight:900; color:#e5e7eb; line-height:1;'>"
-                    f"{h_goals} – {a_goals}"
-                    f"</div>"
-                ),
+                f"""
+                <div style="text-align:center;">
+                <div style="font-size:28px; font-weight:700; line-height:1.2; "
+                     "margin-bottom:2px;">
+                    {h} — {a}
+                </div>
+                <div style="
+                    font-size:44px;
+                    font-weight:900;
+                    line-height:1.0;
+                    color:#e5e7eb;">
+                    {h_goals} – {a_goals}
+                </div>
+                <div style="margin-top:6px; opacity:0.8; font-size:14px;">
+                    {caption}
+                </div>
+                </div>
+                """,
                 unsafe_allow_html=True,
             )
-            # Meta (competition/season [+ date])
-            caption = (
-                meta_str if match_dt is None else f"{meta_str} • {match_dt}"
-            )
-            st.caption(caption)
 
         # ---------- Row 1: per-team xG & goals ----------
         r1c1, r1c2, r1c3, r1c4 = st.columns(4)
@@ -524,6 +551,17 @@ def run() -> None:
         # ----- Timeline -----
         st.subheader("Cumulative xG Timeline")
         timeline = cumulative_xg_plot(ms)
+
+        # Make it shorter & tighter in compact mode
+        try:
+            timeline.update_layout(
+                height=340 if compact else 520,
+                margin=dict(l=20, r=20, t=30, b=40),
+                legend=dict(orientation="h", y=-0.2)
+            )
+        except Exception:
+            pass
+
         plot(timeline)
 
         # Data freshness
@@ -580,7 +618,7 @@ def run() -> None:
             pitch_color="#0B132B",
             line_color="#E5E7EB",
         )
-        fig, ax = pitch.draw(figsize=(12, 8))
+        fig, ax = pitch.draw(figsize=(9, 6) if compact else (12, 8))
 
         for _, r in ms.iterrows():
             base_color = (
@@ -669,7 +707,7 @@ def run() -> None:
                 pitch_color="#0B132B",
                 line_color="#E5E7EB",
             )
-            fig2, ax2 = pitch.draw(figsize=(12, 8))
+            fig2, ax2 = pitch.draw(figsize=(9, 6) if compact else (12, 8))
 
             edge_scale = max(1.0, float(net.edges["count"].max() or 0))
 
