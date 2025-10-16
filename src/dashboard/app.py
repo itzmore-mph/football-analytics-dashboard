@@ -486,26 +486,28 @@ def run() -> None:
         center = st.columns([1, 6, 1])[1]
         with center:
             caption = (
-                meta_str if match_dt is None else f"{meta_str} • {match_dt}"
+                meta_str if match_dt is None
+                else f"{meta_str} • {match_dt}"
             )
             st.markdown(
                 f"""
                 <div style="text-align:center;">
-                  <div style=(
-                      "font-size:28px; font-weight:700; "
-                      "line-height:1.2; margin-bottom:2px;"
-                  )>
+                <div style="
+                    font-size:28px; font-weight:700;
+                    line-height:1.2; margin-bottom:2px;
+                ">
                     {h} — {a}
-                  </div>
-                  <div style=(
-                      "font-size:44px; font-weight:900; "
-                      "line-height:1.0; color:#e5e7eb;"
-                  )>
+                </div>
+                <div style="
+                    font-size:44px; font-weight:900;
+                    line-height:1.0; color:#e5e7eb;
+                    font-variant-numeric: tabular-nums;
+                ">
                     {h_goals} – {a_goals}
-                  </div>
-                  <div style="margin-top:6px; opacity:0.8; font-size:14px;">
+                </div>
+                <div style="margin-top:6px; opacity:0.8; font-size:14px;">
                     {caption}
-                  </div>
+                </div>
                 </div>
                 """,
                 unsafe_allow_html=True,
