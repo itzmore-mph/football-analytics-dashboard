@@ -146,12 +146,12 @@ def _build_demo_artifacts() -> dict:
 @cache_data(show_spinner=False)
 def load_data() -> tuple[pd.DataFrame, pd.DataFrame]:
     shots = (
-        pd.read_csv(settings.processed_shots_csv)
+        pd.read_csv(settings.processed_shots_csv, low_memory=False)
         if settings.processed_shots_csv.exists()
         else pd.DataFrame()
     )
     passes = (
-        pd.read_csv(settings.passing_events_csv)
+        pd.read_csv(settings.passing_events_csv, low_memory=False)
         if settings.passing_events_csv.exists()
         else pd.DataFrame()
     )
@@ -174,7 +174,11 @@ def run() -> None:
     st.markdown("*Statistical analysis powered by StatsBomb Open Data*")
 
     if not _artifacts_exist():
-        with st.container(border=True):
+        try:
+            ctx = st.container(border=True)  # newer Streamlit
+        except TypeError:
+            ctx = st.container()              # older Streamlit fallback
+        with ctx:
             st.info(
                 "No data/model artifacts found yet.\n\n"
                 "Click the button below to build a small demo dataset "
@@ -183,6 +187,12 @@ def run() -> None:
             if st.button("Build demo data now"):
                 with st.spinner("Building demo data… "):
                     _ = _build_demo_artifacts()
+                # ⬇️ Clear cached frames so the new CSVs are read on rerun
+                try:
+                    load_data.clear()
+                    st.cache_data.clear()   # safe on newer Streamlit
+                except Exception:
+                    pass
                 st.success("Demo data built. Reloading…")
                 st.rerun()
         st.stop()
@@ -197,6 +207,24 @@ def run() -> None:
 
     # Predict xG for shots
     shots = shots.copy()
+
+    # Guard against missing features after preprocessing changes
+    missing = [c for c in FEATURE_COLUMNS if c not in shots.columns]
+    if missing:
+        st.error(
+            f"Missing feature columns: {missing}. "
+            "Try rebuilding demo data in Settings."
+        )
+        st.stop()
+
+    # Guard against unexpected model types
+    if not hasattr(model, "predict_proba"):
+        st.error(
+            "Loaded model doesn’t support predict_proba(). "
+            "Re-train the model in demo builder."
+        )
+        st.stop()
+
     shots["xg"] = model.predict_proba(shots[FEATURE_COLUMNS].values)[:, 1]
 
     # Sidebar — Match selection (with friendly labels)
@@ -640,6 +668,11 @@ def run() -> None:
                     )
                     build_and_save_passing_events(mids)
                     build_processed_shots(mids)
+                try:
+                    load_data.clear()
+                    st.cache_data.clear()
+                except Exception:
+                    pass
                 st.success(
                     f"Added/updated {len(mids)} matches from {comp_name} "
                     f"{season_name or ''}. Reloading…"
@@ -650,7 +683,7 @@ def run() -> None:
 
         st.markdown("---")
         st.subheader("About")
-# Cleaned up stray parentheses/quotes so the copy renders nicely
+        # Cleaned up stray parentheses/quotes so the copy renders nicely
         st.markdown(
             """
             This dashboard provides football analytics using
