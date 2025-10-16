@@ -1,6 +1,6 @@
 # ⚽ Football Analytics Dashboard
 
-[![Streamlit](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://football-analytics-dashboard.streamlit.app/)
+[![Streamlit](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)]([https://football-analytics-dashboard.streamlit.app/](https://football-xgcloud.streamlit.app/))
 
 Professional multi-tab football analytics dashboard featuring **Expected Goals (xG) modeling** and **Passing Network analysis** using **StatsBomb Open Data**.
 
