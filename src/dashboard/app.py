@@ -303,7 +303,7 @@ def run() -> None:
             "🎯 xG Model & Pitch",
             "🔗 Passing Network",
             "📈 Statistics",
-            "⚙️ Settings",
+            "⚙️ Data Fetch & Settings",
         ]
     )
 
