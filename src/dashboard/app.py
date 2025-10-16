@@ -467,10 +467,21 @@ def run() -> None:
         # Centered scoreline
         sc1, sc2, sc3 = st.columns([1, 2, 1])
         with sc2:
-            st.markdown(f"### **{h} {h_goals} – {a_goals} {a}**")
+            # Line 1: teams
+            st.markdown(f"### {h} — {a}")
+            # Line 2: big score with accent color (good contrast on dark theme)
+            st.markdown(
+                (
+                    f"<div style='text-align:center; font-size:44px; "
+                    f"font-weight:900; color:#e5e7eb; line-height:1;'>"
+                    f"{h_goals} – {a_goals}"
+                    f"</div>"
+                ),
+                unsafe_allow_html=True,
+            )
+            # Meta (competition/season [+ date])
             caption = (
-                meta_str if match_dt is None
-                else f"{meta_str} • {match_dt}"
+                meta_str if match_dt is None else f"{meta_str} • {match_dt}"
             )
             st.caption(caption)
 
