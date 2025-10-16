@@ -215,11 +215,16 @@ def run() -> None:
     st.markdown(
         """
         <style>
-        .block-container {
-            max-width: 1200px;
-            padding-top: 1rem;
-            padding-bottom: 2rem;
-        }
+            .block-container {
+                max-width: 1200px;
+                padding-top: 2.5rem !important;  /* prevent H1 clipping */
+                padding-bottom: 2rem;
+                overflow: visible;
+            }
+            .block-container h1 {
+                margin-top: 0.25rem !important;
+                line-height: 1.2 !important;
+            }
         </style>
         """,
         unsafe_allow_html=True,
