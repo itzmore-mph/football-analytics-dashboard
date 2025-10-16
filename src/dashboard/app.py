@@ -46,6 +46,39 @@ except Exception:
     cache_resource = cast(Any, _cache_resource)
 
 
+# Streamlit compatibility helpers (work across versions)
+
+def _df_full_width(df: pd.DataFrame, **kwargs):
+    """
+    Prefer new API (width='stretch');
+    fall back to legacy (use_container_width=True).
+    """
+    try:
+        # Newer Streamlit (some local envs): accepts string widths
+        return st.dataframe(df, width="stretch", **kwargs)
+    except TypeError:
+        # Older/Cloud images: only accept int/None and legacy flag
+        return st.dataframe(df, use_container_width=True, **kwargs)
+
+
+def _plotly_full_width(fig, **kwargs):
+    """
+    Ensure Plotly charts size to container across versions.
+    Move any config kwargs into the config dict explicitly.
+    """
+    cfg = kwargs.pop("config", {})
+    # never pass width strings to Plotly itself; let Streamlit handle sizing
+    try:
+        return st.plotly_chart(fig, width="stretch", config=cfg, **kwargs)
+    except TypeError:
+        return st.plotly_chart(
+            fig,
+            use_container_width=True,
+            config=cfg,
+            **kwargs
+            )
+
+
 @cache_data(show_spinner=False)
 def _list_competitions_df() -> pd.DataFrame:
     from src.open_data import competitions
@@ -66,7 +99,7 @@ def _list_seasons_for_comp(comp_name: str) -> list[str]:
 
 
 def plot(fig) -> None:
-    st.plotly_chart(fig, width="stretch")
+    _plotly_full_width(fig)
 
 
 # ---------------------------------------------------------------------
@@ -363,7 +396,9 @@ def run() -> None:
         calibration_plot_path = settings.plots_dir / "calibration.png"
         if calibration_plot_path.exists():
             st.subheader("Model Calibration")
-            st.image(str(calibration_plot_path), width="stretch")
+            # st.image doesn't support string widths on older versions
+            # Use column width so it scales nicely in both old/new versions
+            st.image(str(calibration_plot_path), use_column_width=True)
             st.caption(
                 "Calibration plot showing predicted xG vs actual goal rate"
             )
@@ -506,7 +541,7 @@ def run() -> None:
             "Shots",
             "Avg Distance",
         ]
-        st.dataframe(team_stats, width="stretch")
+        _df_full_width(team_stats)
 
         # Player-level stats
         st.subheader("Top Players by xG")
@@ -519,7 +554,7 @@ def run() -> None:
                 .head(10)
             )
             player_stats.columns = ["Total xG", "Goals", "Avg Distance"]
-            st.dataframe(player_stats, width="stretch")
+            _df_full_width(player_stats)
 
         # Export shots
         st.subheader("Export Data")
@@ -615,18 +650,14 @@ def run() -> None:
 
         st.markdown("---")
         st.subheader("About")
+# Cleaned up stray parentheses/quotes so the copy renders nicely
         st.markdown(
             """
-            (
-                (
-                (
-                    "This dashboard provides football analytics using "
-                    "Expected Goals (xG) "
-                )
-                "modeling and passing network analysis."
-            )
+            This dashboard provides football analytics using
+            **Expected Goals (xG)**
+            modeling and passing network analysis.
 
-            **Features:**
+            **Features**
             - xG prediction using XGBoost with calibration
             - Shot maps with xG visualization
             - Passing networks with player positions
