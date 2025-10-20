@@ -46,6 +46,29 @@ except Exception:
     cache_resource = cast(Any, _cache_resource)
 
 
+# Small data-shape helpers
+def _ensure_xy(df: pd.DataFrame) -> pd.DataFrame:
+    """Guarantee location.x / location.y exist for plotting."""
+    if "location.x" in df.columns and "location.y" in df.columns:
+        return df
+    if "location" in df.columns:
+        loc = df["location"].dropna()
+        try:
+            df = df.copy()
+            df["location.x"] = loc.apply(
+                lambda v: v[0] if isinstance(v, (list, tuple)) and len(v) > 1
+                else None
+            )
+            df["location.y"] = loc.apply(
+                lambda v: v[1] if isinstance(v, (list, tuple)) and len(v) > 1
+                else None
+            )
+        except Exception:
+            # If parsing fails, return original frame
+            return df
+    return df
+
+
 # Streamlit compatibility helpers (work across versions)
 def _df_full_width(df: pd.DataFrame, **kwargs):
     """
@@ -246,6 +269,7 @@ def run() -> None:
                     _ = _build_demo_artifacts()
                 try:
                     load_data.clear()
+                    _list_competitions_df.clear()
                     st.cache_data.clear()
                 except Exception:
                     pass
@@ -460,11 +484,15 @@ def run() -> None:
             )
             h_team, a_team = (teams_order + [None, None])[:2]
 
-        match_dt = (
-            pd.to_datetime(ms["match_date"].dropna().iloc[0]).date()
-            if "match_date" in ms.columns and ms["match_date"].notna().any()
-            else None
-        )
+        if "match_date" in ms.columns and ms["match_date"].notna().any():
+            _md = pd.to_datetime(ms["match_date"].dropna(), errors="coerce")
+            match_dt = (
+                _md.iloc[0].date()
+                if not _md.empty and pd.notna(_md.iloc[0])
+                else None
+            )
+        else:
+            match_dt = None
 
         goals_by_team = (
             ms.groupby("team.name")["is_goal"].sum().astype(int).to_dict()
@@ -644,6 +672,8 @@ def run() -> None:
         )
 
         st.subheader("Shot Map")
+        # Ensure we have split coordinates for plotting
+        ms = _ensure_xy(ms)
         pitch = Pitch(
             pitch_type="statsbomb",
             pitch_color="#0B132B",
@@ -717,9 +747,11 @@ def run() -> None:
         with c2:
             st.metric("Passing Connections", len(net.edges))
         with c3:
-            max_passes = (
-                int(net.edges["count"].max()) if not net.edges.empty else 0
-            )
+            max_passes = 0
+            if not net.edges.empty and "count" in net.edges.columns:
+                _cmax = net.edges["count"].max()
+                if pd.notna(_cmax):
+                    max_passes = int(_cmax)
             st.metric("Max Passes", max_passes)
 
         if net.edges.empty:
@@ -736,7 +768,11 @@ def run() -> None:
             pn_w, pn_h = (9, 6) if compact else (12, 8)
             fig2, ax2 = pitch.draw(figsize=(pn_w, pn_h))
 
-            edge_scale = max(1.0, float(net.edges["count"].max() or 0))
+            edge_scale = 1.0
+            if not net.edges.empty and "count" in net.edges.columns:
+                _cmax = net.edges["count"].max()
+                if pd.notna(_cmax) and _cmax > 0:
+                    edge_scale = float(_cmax)
 
             if "player_name" not in net.nodes.columns:
                 if "player" in net.nodes.columns:
@@ -783,10 +819,18 @@ def run() -> None:
                     )
                     else "#60a5fa"
                 )
+                touches_val = 0
+                if "touches" in n.index and pd.notna(n["touches"]):
+                    try:
+                        touches_val = int(n["touches"])
+                    except Exception:
+                        touches_val = 0
+                size_val = 80 + 3 * touches_val
                 pitch.scatter(
                     n["x_mean"],
                     n["y_mean"],
                     s=80 + 3 * n["touches"],
+                    s=size_val,
                     ax=ax2,
                     color=node_color,
                     edgecolors="#1f2937",
@@ -922,6 +966,7 @@ def run() -> None:
                     build_processed_shots(mids)
                 try:
                     load_data.clear()
+                    _list_competitions_df.clear()
                     st.cache_data.clear()
                 except Exception:
                     pass
