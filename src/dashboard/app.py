@@ -579,17 +579,46 @@ def run() -> None:
     # ───────────────────── xG Model & Pitch ─────────────────────
     with tab_xg_pitch:
         st.header("Shot Map & xG Model")
-        st.caption(
-            "• Each dot is a shot. "
-            "Dot **size** scales with predicted xG "
-            "(chance of scoring).\n"
-            "• **Colors**: green=goal, "
-            "yellow=high xG (above slider), "
-            "red=low xG.\n"
-            "• Use the **xG Threshold** slider to highlight "
-            "high-probability shots."
-        )
+        st.markdown(
+            """
+        <style>
+        .xg-help {
+            padding: 10px 14px;
+            border-radius: 10px;
+            font-size: 0.95rem;
+            line-height: 1.35;
+            margin-top: 4px;
+            border: 1px solid rgba(0,0,0,0.08);
+            background: rgba(0,0,0,0.035);
+        }
+        .xg-help strong { font-weight: 600; }
+        .xg-help ul { margin: 6px 0 0 1.1rem; padding: 0; }
+        .xg-help li { margin: 2px 0; }
+        /* Dark theme */
+        [data-theme="dark"] .xg-help {
+            border: 1px solid rgba(255,255,255,0.10);
+            background: rgba(255,255,255,0.05);
+        }
+        </style>
 
+        <div class="xg-help">
+        <strong>How to read this plot</strong>
+        <ul>
+            <li>
+                Each dot is a shot. Dot <em>size</em> scales with predicted xG
+                (chance of scoring).
+            </li>
+            <li><strong>Colors:</strong> green = goal, yellow = high xG
+            (above slider), red = low xG.</li>
+            <li>
+                Use the <strong>xG Threshold</strong> slider to highlight
+                high-probability shots.
+            </li>
+        </ul>
+        </div>
+        """,
+            unsafe_allow_html=True,
+        )
         model_report_path = settings.models_dir / "model_report.json"
         if model_report_path.exists():
             with open(model_report_path) as f:
