@@ -244,13 +244,50 @@ def collect_matches_by_name(
     ascending: bool = True,
 ) -> list[int]:
     """
-    Collect match_ids for a given competition name (e.g. "FIFA World Cup").
-    If season_name is None, picks the latest season for that competition.
+    Collect match_ids for a given competition name.
+    If season_name is None, pick the latest season for that competition.
+    Always returns a list[int], never None.
     """
     dfc = competitions()
     cdf = dfc[dfc["competition_name"] == competition_name].copy()
     if cdf.empty:
         raise ValueError(f"Competition not found: {competition_name!r}")
 
+    # Choose season
     if season_name:
-        cdf
+        cdf = cdf[cdf["season_name"] == season_name].copy()
+        if cdf.empty:
+            raise ValueError(
+                f"Season not found for {competition_name!r}: {season_name!r}"
+            )
+    else:
+        # "Latest" is safest by season_id if numeric and present, fallback to season_name sort
+        if "season_id" in cdf.columns and cdf["season_id"].notna().any():
+            cdf = cdf.sort_values("season_id", ascending=False)
+        else:
+            cdf = cdf.sort_values("season_name", ascending=False)
+
+    row = cdf.iloc[0]
+    comp_id = int(row["competition_id"])
+    season_id = int(row["season_id"])
+
+    ms = matches(comp_id, season_id)
+
+    if ms is None or ms.empty or "match_id" not in ms.columns:
+        raise RuntimeError(
+            f"No matches available for competition_id={comp_id}, season_id={season_id}"
+        )
+
+    # Optional: sort by match_date if available
+    if sort_by_date and "match_date" in ms.columns:
+        ms = ms.copy()
+        ms["match_date"] = pd.to_datetime(ms["match_date"], errors="coerce")
+        ms = ms.sort_values("match_date", ascending=ascending)
+
+    ids = ms["match_id"].dropna().astype(int).tolist()
+    if not ids:
+        raise RuntimeError(
+            f"No match_ids found for competition_id={comp_id}, season_id={season_id}"
+        )
+
+    return ids[:limit] if limit else ids
