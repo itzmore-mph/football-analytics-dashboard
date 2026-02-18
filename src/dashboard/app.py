@@ -138,16 +138,17 @@ def load_model():
 # App
 # ──────────────────────────────────────────────────────────────────────────────
 def run() -> None:
-    # IMPORTANT: set_page_config must be the first Streamlit command.
-    # Ensure theming.py does ONLY st.set_page_config() and nothing else before it.
+    # IMPORTANT: set_page_config must be the first Streamlit command
+    # Make sure set_theme() only calls st.set_page_config() and nothing else.
     set_theme()
 
     # Title + short description
     st.title("⚽ Football Analytics Dashboard")
     st.markdown(
-        "This dashboard provides football analytics using "
-        "**Expected Goals (xG)** modeling and passing network analysis."
+        "Interactive match analytics with **xG modeling**, **shot maps**, and **passing networks**. "
+        "Use the sidebar to filter by competition, season, match, and minute range."
     )
+
     st.caption("*Statistical analysis powered by StatsBomb Open Data*")
 
     # Tighter page width & padding (CSS)
@@ -180,24 +181,34 @@ def run() -> None:
             st.info(
                 "No data/model artifacts found yet.\n\n"
                 "Click the button below to build a small demo dataset "
-                "(fetch → feature → train)."
+                "(fetch -> feature -> train)."
             )
             if st.button("Build demo data now"):
-                with st.spinner("Building demo data…"):
+                with st.spinner("Building demo data..."):
                     _ = _build_demo_artifacts()
+
+                # Clear only what we need, avoid calling non-existent clear() methods
                 try:
                     load_data.clear()
-                    st.cache_data.clear()
+                except Exception:
+                    pass
+                try:
                     load_model.clear()
+                except Exception:
+                    pass
+                try:
+                    st.cache_data.clear()
                     st.cache_resource.clear()
                 except Exception:
                     pass
-                st.success("Demo data built. Reloading…")
+
+                st.success("Demo data built. Reloading...")
                 st.rerun()
         st.stop()
 
     # Sidebar filters and compact layout toggle
     filters = sidebar_filters()
+
     try:
         compact = st.sidebar.toggle(
             "Compact layout",
@@ -236,8 +247,9 @@ def run() -> None:
     comp_col = "competition_name" if "competition_name" in shots.columns else None
     season_col = "season_name" if "season_name" in shots.columns else None
 
+    # Ensure we do not double-render "Filters" if sidebar_filters already shows it
     st.sidebar.markdown("---")
-    st.sidebar.subheader("Filters")
+    st.sidebar.subheader("Competition / Season")
 
     if comp_col:
         comp_options = ["(All)"] + sorted(shots[comp_col].dropna().unique().tolist())
@@ -276,6 +288,7 @@ def run() -> None:
     st.sidebar.subheader("Match Selection")
 
     def _match_label(mid: int) -> str:
+        # Prefer fixture if available (and format nicely)
         if "fixture" in shots_filtered.columns:
             lab = (
                 shots_filtered.loc[shots_filtered["match_id"] == mid, "fixture"]
@@ -287,14 +300,20 @@ def run() -> None:
             if lab:
                 if "match_date" in shots_filtered.columns:
                     md = (
-                        pd.to_datetime(shots_filtered.loc[shots_filtered["match_id"] == mid, "match_date"])
+                        pd.to_datetime(
+                            shots_filtered.loc[shots_filtered["match_id"] == mid, "match_date"],
+                            errors="coerce",
+                        )
                         .dropna()
+                        .dt.date
                         .astype(str)
                         .head(1)
                         .tolist()
                     )
-                    return f"{lab[0]}, {md[0]}" if md else lab[0]
+                    return f"{lab[0]} , {md[0]}" if md else lab[0]
                 return lab[0]
+
+        # Fallback: build "Team A vs. Team B"
         teams = (
             shots_filtered.loc[shots_filtered["match_id"] == mid, "team.name"]
             .dropna()
@@ -303,8 +322,31 @@ def run() -> None:
             if "team.name" in shots_filtered.columns
             else []
         )
-        vs = " vs ".join(teams[:2]) if teams else f"Match {mid}"
-        return f"{vs}, {mid}"
+
+        if len(teams) >= 2:
+            vs = f"{teams[0]} vs. {teams[1]}"
+        elif len(teams) == 1:
+            vs = teams[0]
+        else:
+            vs = f"Match {mid}"
+
+        # Optional: add date if present
+        if "match_date" in shots_filtered.columns:
+            md = (
+                pd.to_datetime(
+                    shots_filtered.loc[shots_filtered["match_id"] == mid, "match_date"],
+                    errors="coerce",
+                )
+                .dropna()
+                .dt.date
+                .astype(str)
+                .head(1)
+                .tolist()
+            )
+            if md:
+                return f"{vs} , {md[0]}"
+
+        return vs
 
     if "match_id" not in shots_filtered.columns or shots_filtered["match_id"].dropna().empty:
         st.sidebar.warning("No matches available for current filters.")
@@ -343,8 +385,12 @@ def run() -> None:
         st.stop()
 
     # Player filter
-    available_players = sorted(ms.get("player.name", pd.Series(dtype=str)).dropna().unique().tolist())
-    selected_players = st.sidebar.multiselect("Players (filter shots & stats)", available_players)
+    available_players = sorted(
+        ms.get("player.name", pd.Series(dtype=str)).dropna().unique().tolist()
+    )
+    selected_players = st.sidebar.multiselect(
+        "Players (filter shots & stats)", available_players
+    )
     if selected_players and "player.name" in ms.columns:
         ms = ms[ms["player.name"].isin(selected_players)]
 
@@ -358,6 +404,7 @@ def run() -> None:
             "⚙️ Data Fetch & Settings",
         ]
     )
+
 
     # ───────────────────────── Overview ─────────────────────────
     with tab_overview:

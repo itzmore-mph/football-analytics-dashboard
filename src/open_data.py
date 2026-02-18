@@ -227,7 +227,7 @@ def collect_demo_matches(plan: DemoPlan | None = None) -> list[int]:
     """
     Deterministic demo sampler used by your 'Build demo data' button.
 
-    Picks the most recent matches by match_date from the Bundesliga season,
+    Picks the most recent matches from the Bundesliga season,
     then applies settings.demo_matches as an optional cap.
 
     Returns list[int], possibly empty.
@@ -236,24 +236,19 @@ def collect_demo_matches(plan: DemoPlan | None = None) -> list[int]:
         plan = DemoPlan()
 
     ms = matches(plan.competition_id, plan.season_id)
-    if ms.empty:
+    if ms is None or ms.empty or "match_id" not in ms.columns:
         return []
 
-    # newest first
-    ms = ms.sort_values("match_date", ascending=False, na_position="last")
+    # Prefer match_date if present, fallback to match_id
+    if "match_date" in ms.columns and ms["match_date"].notna().any():
+        ms = ms.sort_values("match_date", ascending=False, na_position="last")
+    else:
+        ms = ms.sort_values("match_id", ascending=False)
 
-    ids = (
-        ms["match_id"]
-        .dropna()
-        .astype(int)
-        .head(plan.matches_per_season)
-        .tolist()
-    )
+    ids = ms["match_id"].dropna().astype(int).head(plan.matches_per_season).tolist()
 
     cap = getattr(settings, "demo_matches", None)
-    if cap is not None:
-        return ids[: int(cap)]
-    return ids
+    return ids[: int(cap)] if cap is not None else ids
 
 
 # ──────────────────────────────────────────────────────────────────────────────
