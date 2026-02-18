@@ -42,24 +42,47 @@ def matches(comp_id: int, season_id: int) -> pd.DataFrame:
     Adds convenience columns: home_team, away_team, match_date (if present).
     """
     data = read_remote_json(f"{RAW_BASE}/matches/{comp_id}/{season_id}.json")
-    df = pd.DataFrame(data)
 
-    # Normalize a few convenient columns if available
-    rename_map = {
-        "home_team.home_team_name": "home_team",
-        "away_team.away_team_name": "away_team",
-    }
-    for k, v in rename_map.items():
-        if k in df.columns and v not in df.columns:
-            df[v] = df[k]
+    # Flatten nested dicts into columns like home_team.home_team_name
+    df = pd.json_normalize(data, sep=".")
 
-    # Keep common fields present for downstream selectors
+    # Convenience string columns
+    if "home_team.home_team_name" in df.columns:
+        df["home_team"] = df["home_team.home_team_name"]
+    elif "home_team" in df.columns:
+        # fallback if the API already gives a string
+        df["home_team"] = df["home_team"].astype("string")
+
+    if "away_team.away_team_name" in df.columns:
+        df["away_team"] = df["away_team.away_team_name"]
+    elif "away_team" in df.columns:
+        df["away_team"] = df["away_team"].astype("string")
+
+    # Keep common fields for downstream selectors
     expected = ["match_id", "home_team", "away_team", "match_date"]
     for c in expected:
         if c not in df.columns:
             df[c] = pd.NA
 
+    # Enforce nice dtypes
+    df["home_team"] = df["home_team"].astype("string")
+    df["away_team"] = df["away_team"].astype("string")
+    if "match_date" in df.columns:
+        df["match_date"] = pd.to_datetime(df["match_date"], errors="coerce")
+
     return df
+
+def _extract_team_name(x):
+    if isinstance(x, dict):
+        # StatsBomb matches often store home_team_name/away_team_name inside the dict
+        return x.get("home_team_name") or x.get("away_team_name") or x.get("name")
+    return x
+
+# after df is created (either via DataFrame or json_normalize)
+if "home_team" in df.columns:
+    df["home_team"] = df["home_team"].map(_extract_team_name)
+if "away_team" in df.columns:
+    df["away_team"] = df["away_team"].map(_extract_team_name)
 
 
 def events(match_id: int) -> pd.DataFrame:
