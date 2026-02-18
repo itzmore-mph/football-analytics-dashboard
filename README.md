@@ -394,10 +394,14 @@ Contributions are welcome! Please follow these steps:
 
 ## 📬 Contact
 
-**👨‍💻 Moritz Philipp Haaf, BSc MA**  
+**👨‍💻 Moritz Philipp Haaf, BSc MA**
+
 **📩 Email:** [itzmore.dev@gmail.com](mailto:itzmore.dev@gmail.com)
-**🔗 Portfolio Website:** [https://itzmore.dev](https://itzmore.dev)  
-**🔗 GitHub:** [https://github.com/itzmore-mph](https://github.com/itzmore-mph)  
+
+**🔗 Portfolio Website:** [https://itzmore.dev](https://itzmore.dev)
+
+**🔗 GitHub:** [https://github.com/itzmore-mph](https://github.com/itzmore-mph)
+
 **🔗 LinkedIn:** [https://linkedin.com/in/moritz-philipp-haaf/](https://linkedin.com/in/moritz-philipp-haaf/)  
 
 🚀 **If you found this useful, give this repo a ⭐ and share your feedback!**
