@@ -151,7 +151,7 @@ def build_and_save_passing_events(match_ids: Iterable[int]) -> pd.DataFrame:
     csv_path: Path = settings.passing_events_csv
     if csv_path.exists():
         try:
-            out_old = pd.read_csv(csv_path)
+            out_old = pd.read_csv(csv_path, low_memory=False, dtype_backend="numpy_nullable")
             out = pd.concat([out_old, out_new], ignore_index=True)
             subset = [
                 c

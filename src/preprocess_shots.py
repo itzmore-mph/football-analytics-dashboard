@@ -250,8 +250,14 @@ def build_processed_shots(match_ids: Iterable[int]) -> pd.DataFrame:
     csv_path: Path = settings.processed_shots_csv
     if csv_path.exists():
         try:
-            out_old = pd.read_csv(csv_path, low_memory=False)
-            out = pd.concat([out_old, out_new], ignore_index=True)
+            out_old = pd.read_csv(csv_path, low_memory=False, dtype_backend="numpy_nullable")
+            frames = []
+            if out_old is not None and not out_old.empty:
+                frames.append(out_old)
+            if out_new is not None and not out_new.empty:
+                frames.append(out_new)
+
+            out = pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
             if "id" in out.columns:
                 out = out.drop_duplicates(subset=["match_id", "id"])
             else:

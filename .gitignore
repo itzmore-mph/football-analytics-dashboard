@@ -15,6 +15,11 @@ __pycache__/
 # Data & models (tracked via .gitkeep only)
 data/
 models/
+data/*.csv
+data/out/
+data/processed/
+models/
+plots/
 
 
 # Notebooks checkpoints

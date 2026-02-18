@@ -459,7 +459,7 @@ def run() -> None:
                 f"""
                 <div style="text-align:center;">
                 <div style="font-size:28px; font-weight:700; line-height:1.2; margin-bottom:2px;">
-                    {h} , {a}
+                    {h} vs. {a}
                 </div>
                 <div style="font-size:44px; font-weight:900; line-height:1.0; color:#e5e7eb; font-variant-numeric: tabular-nums;">
                     {h_goals} - {a_goals}
